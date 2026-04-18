@@ -88,27 +88,27 @@ namespace Game.Gameplay.Board
             }
 
             var freeIndices = new HashSet<int>(Enumerable.Range(0, cellCount));
-            var allPairs = GetAllNeighbourPairs(cellCount, columns);
-            Shuffle(allPairs);
-
-            foreach (var pair in allPairs)
+            while (plannedPairs.Count < targetPairCount)
             {
-                if (!freeIndices.Contains(pair.FirstIndex) || !freeIndices.Contains(pair.SecondIndex))
+                int anchorIndex = GetMostConstrainedPairIndex(freeIndices, columns, cellCount);
+                if (anchorIndex < 0)
                 {
-                    continue;
+                    return false;
                 }
 
-                plannedPairs.Add(pair);
-                freeIndices.Remove(pair.FirstIndex);
-                freeIndices.Remove(pair.SecondIndex);
-
-                if (plannedPairs.Count == targetPairCount)
+                List<int> candidateNeighbours = GetAvailablePairNeighbours(anchorIndex, freeIndices, columns, cellCount);
+                if (candidateNeighbours.Count == 0)
                 {
-                    return true;
+                    return false;
                 }
+
+                int neighbourIndex = candidateNeighbours[_random.Next(candidateNeighbours.Count)];
+                plannedPairs.Add(OrderPair(anchorIndex, neighbourIndex));
+                freeIndices.Remove(anchorIndex);
+                freeIndices.Remove(neighbourIndex);
             }
 
-            return false;
+            return true;
         }
 
         private bool TryPlacePlannedPairs(
@@ -155,22 +155,33 @@ namespace Game.Gameplay.Board
                 .Where(index => numbers[index] == 0)
                 .ToList();
 
-            while (remainingIndices.Count > 0)
+            return TryFillSafeNumbers(numbers, columns, remainingIndices);
+        }
+
+        private bool TryFillSafeNumbers(int[] numbers, int columns, List<int> remainingIndices)
+        {
+            if (remainingIndices.Count == 0)
             {
-                int index = GetMostConstrainedIndex(remainingIndices, numbers, columns);
-                remainingIndices.Remove(index);
-
-                var candidates = GetSafeNumbers(index, numbers, columns);
-
-                if (candidates.Count == 0)
-                {
-                    return false;
-                }
-
-                numbers[index] = candidates[0];
+                return true;
             }
 
-            return true;
+            int index = GetMostConstrainedIndex(remainingIndices, numbers, columns);
+            remainingIndices.Remove(index);
+
+            var candidates = GetSafeNumbers(index, numbers, columns);
+            foreach (int candidate in candidates)
+            {
+                numbers[index] = candidate;
+
+                if (TryFillSafeNumbers(numbers, columns, remainingIndices))
+                {
+                    return true;
+                }
+            }
+
+            numbers[index] = 0;
+            remainingIndices.Add(index);
+            return false;
         }
 
         private bool CanPlaceNumber(
@@ -227,41 +238,6 @@ namespace Game.Gameplay.Board
             return pairCount;
         }
 
-        private List<BoardCell> BuildCells(IReadOnlyList<int> numbers, int columns)
-        {
-            var cells = new List<BoardCell>(numbers.Count);
-
-            for (int index = 0; index < numbers.Count; index++)
-            {
-                int row = index / columns;
-                int column = index % columns;
-                cells.Add(new BoardCell(index, row, column, numbers[index]));
-            }
-
-            return cells;
-        }
-
-        private List<(int FirstIndex, int SecondIndex)> GetAllNeighbourPairs(int cellCount, int columns)
-        {
-            var pairs = new List<(int FirstIndex, int SecondIndex)>();
-
-            for (int index = 0; index < cellCount; index++)
-            {
-                IReadOnlyList<int> neighbourIndices = GetOpeningNeighbourIndices(index, columns, cellCount);
-                foreach (int neighbourIndex in neighbourIndices)
-                {
-                    if (neighbourIndex <= index)
-                    {
-                        continue;
-                    }
-
-                    pairs.Add((index, neighbourIndex));
-                }
-            }
-
-            return pairs;
-        }
-
         private List<int> GetSafeNumbers(int index, IReadOnlyList<int> numbers, int columns)
         {
             var candidates = Enumerable.Range(1, 9)
@@ -274,10 +250,12 @@ namespace Game.Gameplay.Board
         private int GetMostConstrainedIndex(IReadOnlyList<int> remainingIndices, IReadOnlyList<int> numbers, int columns)
         {
             int bestIndex = remainingIndices[0];
+            int bestCandidateCount = int.MaxValue;
             int bestFilledNeighbours = -1;
 
             foreach (int index in remainingIndices)
             {
+                int candidateCount = GetSafeNumbers(index, numbers, columns).Count;
                 int filledNeighbours = 0;
                 IReadOnlyList<int> neighbourIndices = GetOpeningNeighbourIndices(index, columns, numbers.Count);
                 foreach (int neighbourIndex in neighbourIndices)
@@ -288,20 +266,81 @@ namespace Game.Gameplay.Board
                     }
                 }
 
-                if (filledNeighbours > bestFilledNeighbours)
+                if (candidateCount < bestCandidateCount)
+                {
+                    bestCandidateCount = candidateCount;
+                    bestFilledNeighbours = filledNeighbours;
+                    bestIndex = index;
+                    continue;
+                }
+
+                if (candidateCount == bestCandidateCount && filledNeighbours > bestFilledNeighbours)
                 {
                     bestFilledNeighbours = filledNeighbours;
                     bestIndex = index;
                     continue;
                 }
 
-                if (filledNeighbours == bestFilledNeighbours && _random.Next(2) == 0)
+                if (candidateCount == bestCandidateCount &&
+                    filledNeighbours == bestFilledNeighbours &&
+                    _random.Next(2) == 0)
                 {
                     bestIndex = index;
                 }
             }
 
             return bestIndex;
+        }
+
+        private int GetMostConstrainedPairIndex(HashSet<int> freeIndices, int columns, int count)
+        {
+            var candidateIndices = freeIndices.ToList();
+            Shuffle(candidateIndices);
+
+            int bestIndex = -1;
+            int smallestNeighbourCount = int.MaxValue;
+
+            foreach (int index in candidateIndices)
+            {
+                int neighbourCount = GetAvailablePairNeighbours(index, freeIndices, columns, count).Count;
+                if (neighbourCount == 0)
+                {
+                    continue;
+                }
+
+                if (neighbourCount < smallestNeighbourCount)
+                {
+                    smallestNeighbourCount = neighbourCount;
+                    bestIndex = index;
+                }
+            }
+
+            return bestIndex;
+        }
+
+        private List<int> GetAvailablePairNeighbours(
+            int index,
+            IReadOnlyCollection<int> freeIndices,
+            int columns,
+            int count)
+        {
+            return GetOpeningNeighbourIndices(index, columns, count)
+                .Where(freeIndices.Contains)
+                .ToList();
+        }
+
+        private List<BoardCell> BuildCells(IReadOnlyList<int> numbers, int columns)
+        {
+            var cells = new List<BoardCell>(numbers.Count);
+
+            for (int index = 0; index < numbers.Count; index++)
+            {
+                int row = index / columns;
+                int column = index % columns;
+                cells.Add(new BoardCell(index, row, column, numbers[index]));
+            }
+
+            return cells;
         }
 
         private IReadOnlyList<int> GetOpeningNeighbourIndices(int index, int columns, int count)
@@ -352,6 +391,13 @@ namespace Game.Gameplay.Board
                 int swapIndex = _random.Next(index + 1);
                 (values[index], values[swapIndex]) = (values[swapIndex], values[index]);
             }
+        }
+
+        private (int FirstIndex, int SecondIndex) OrderPair(int firstIndex, int secondIndex)
+        {
+            return firstIndex < secondIndex
+                ? (firstIndex, secondIndex)
+                : (secondIndex, firstIndex);
         }
     }
 }

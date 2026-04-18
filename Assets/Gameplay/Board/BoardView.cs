@@ -16,6 +16,7 @@ namespace Game.Gameplay.Board
         private RectTransform _contentRect;
         private GridLayoutGroup _gridLayoutGroup;
         private ScrollRect _scrollRect;
+        private Text _scoreLabel;
         private Font _labelFont;
         private int _columns;
         private int _cellCount;
@@ -23,6 +24,36 @@ namespace Game.Gameplay.Board
 
         public static BoardView Create(Transform parent, int columns)
         {
+            var scorePanelObject = new GameObject(
+                "ScorePanel",
+                typeof(RectTransform),
+                typeof(Image));
+
+            scorePanelObject.transform.SetParent(parent, false);
+
+            var scorePanelRect = (RectTransform)scorePanelObject.transform;
+            scorePanelRect.anchorMin = new Vector2(0f, 1f);
+            scorePanelRect.anchorMax = new Vector2(1f, 1f);
+            scorePanelRect.pivot = new Vector2(0.5f, 1f);
+            scorePanelRect.offsetMin = new Vector2(32f, -132f);
+            scorePanelRect.offsetMax = new Vector2(-32f, -32f);
+
+            var scorePanelImage = scorePanelObject.GetComponent<Image>();
+            scorePanelImage.color = new Color(0.16f, 0.18f, 0.24f, 0.96f);
+
+            var scoreLabelObject = new GameObject(
+                "ScoreLabel",
+                typeof(RectTransform),
+                typeof(Text));
+
+            scoreLabelObject.transform.SetParent(scorePanelObject.transform, false);
+
+            var scoreLabelRect = (RectTransform)scoreLabelObject.transform;
+            scoreLabelRect.anchorMin = Vector2.zero;
+            scoreLabelRect.anchorMax = Vector2.one;
+            scoreLabelRect.offsetMin = new Vector2(20f, 12f);
+            scoreLabelRect.offsetMax = new Vector2(-20f, -12f);
+
             var scrollViewObject = new GameObject(
                 "BoardScrollView",
                 typeof(RectTransform),
@@ -36,7 +67,7 @@ namespace Game.Gameplay.Board
             scrollViewRect.anchorMin = Vector2.zero;
             scrollViewRect.anchorMax = Vector2.one;
             scrollViewRect.offsetMin = new Vector2(32f, 32f);
-            scrollViewRect.offsetMax = new Vector2(-32f, -32f);
+            scrollViewRect.offsetMax = new Vector2(-32f, -148f);
 
             var scrollViewImage = scrollViewObject.GetComponent<Image>();
             scrollViewImage.color = new Color(0.12f, 0.14f, 0.18f, 0.92f);
@@ -90,7 +121,7 @@ namespace Game.Gameplay.Board
             scrollRect.scrollSensitivity = 24f;
 
             var boardView = scrollViewObject.GetComponent<BoardView>();
-            boardView.Setup(viewportRect, contentRect, gridLayoutGroup, scrollRect, columns);
+            boardView.Setup(scoreLabelObject.GetComponent<Text>(), viewportRect, contentRect, gridLayoutGroup, scrollRect, columns);
             return boardView;
         }
 
@@ -131,6 +162,16 @@ namespace Game.Gameplay.Board
             _tiles[cell.Index].SetCell(cell);
         }
 
+        public void SetScore(int totalScore)
+        {
+            if (_scoreLabel == null)
+            {
+                return;
+            }
+
+            _scoreLabel.text = $"Score: {totalScore}";
+        }
+
         private void LateUpdate()
         {
             if (_viewportRect == null)
@@ -149,18 +190,28 @@ namespace Game.Gameplay.Board
         }
 
         private void Setup(
+            Text scoreLabel,
             RectTransform viewportRect,
             RectTransform contentRect,
             GridLayoutGroup gridLayoutGroup,
             ScrollRect scrollRect,
             int columns)
         {
+            _scoreLabel = scoreLabel;
             _viewportRect = viewportRect;
             _contentRect = contentRect;
             _gridLayoutGroup = gridLayoutGroup;
             _scrollRect = scrollRect;
             _columns = Mathf.Max(1, columns);
             _labelFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+            _scoreLabel.font = _labelFont;
+            _scoreLabel.fontSize = 42;
+            _scoreLabel.alignment = TextAnchor.MiddleLeft;
+            _scoreLabel.color = Color.white;
+            _scoreLabel.horizontalOverflow = HorizontalWrapMode.Overflow;
+            _scoreLabel.verticalOverflow = VerticalWrapMode.Truncate;
+            _scoreLabel.text = "Score: 0";
         }
 
         private void EnsureTileCount(int requiredCount)
