@@ -6,6 +6,7 @@ using Game.Gameplay.Stage;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace Game.Gameplay.Core
@@ -25,6 +26,7 @@ namespace Game.Gameplay.Core
         private int _columns;
         private int _remainingAdditions;
         private int _additionsPerBoardClear;
+        private GameSessionState _sessionState;
 
         public void Initialize(
             int columns,
@@ -59,12 +61,13 @@ namespace Game.Gameplay.Core
             _boardView.TileClicked += OnTileClicked;
             _boardView.PlusClicked += OnPlusClicked;
             _boardView.HintClicked += OnHintClicked;
+            _boardView.RestartClicked += OnRestartClicked;
             _boardView.SetCells(_boardState.Cells);
             _boardView.ScrollToTop();
             _boardView.SetScore(_scoreService.TotalScore);
-            _boardView.SetAdditions(_remainingAdditions);
-            _boardView.SetPlusButtonInteractable(_remainingAdditions > 0);
+            UpdateAdditionsUi();
             _boardView.SetHintButtonLocked(false);
+            _boardView.HideGameOver();
 
             Debug.Log(
                 $"GameplayController: Generated a scrollable board with {_boardState.Cells.Count} cells, " +
@@ -75,6 +78,8 @@ namespace Game.Gameplay.Core
             Debug.Log(
                 "GameplayController: Click tiles to match them, tap '+' to duplicate active numbers, " +
                 "and tap Hint to highlight a random valid pair.");
+
+            EvaluateSessionState(showNoMovesTooltip: true);
         }
 
         private void OnDestroy()
@@ -84,12 +89,13 @@ namespace Game.Gameplay.Core
                 _boardView.TileClicked -= OnTileClicked;
                 _boardView.PlusClicked -= OnPlusClicked;
                 _boardView.HintClicked -= OnHintClicked;
+                _boardView.RestartClicked -= OnRestartClicked;
             }
         }
 
         private void OnTileClicked(int index)
         {
-            if (_boardState == null || !_boardState.IsSelectable(index))
+            if (_sessionState == GameSessionState.GameOver || _boardState == null || !_boardState.IsSelectable(index))
             {
                 return;
             }
@@ -137,7 +143,7 @@ namespace Game.Gameplay.Core
 
         private void OnPlusClicked()
         {
-            if (_boardState == null || _remainingAdditions <= 0)
+            if (_sessionState == GameSessionState.GameOver || _boardState == null || !CanUsePlus())
             {
                 return;
             }
@@ -161,11 +167,13 @@ namespace Game.Gameplay.Core
             Debug.Log(
                 $"GameplayController: '+' duplicated {addedCount} active numbers. " +
                 $"{_remainingAdditions} additions remaining.");
+
+            EvaluateSessionState(showNoMovesTooltip: true);
         }
 
         private void OnHintClicked()
         {
-            if (_boardState == null || _boardView == null)
+            if (_sessionState == GameSessionState.GameOver || _boardState == null || _boardView == null)
             {
                 return;
             }
@@ -237,16 +245,16 @@ namespace Game.Gameplay.Core
                 Debug.Log(
                     $"GameplayController: Board cleared. Stage is now {_stageState.Stage}. " +
                     $"{_additionsPerBoardClear} additions awarded. Future matches use multiplier x{_stageState.Multiplier}.");
-                return;
             }
-
-            if (resolution.NewlyClearedRowCount > 0)
+            else if (resolution.NewlyClearedRowCount > 0)
             {
                 _boardView.ShowTooltip($"Removed {resolution.NewlyClearedRowCount} row(s).");
                 Debug.Log(
                     $"GameplayController: Removed {resolution.NewlyClearedRowCount} matched row(s). " +
                     $"Rows below shifted up.");
             }
+
+            EvaluateSessionState(showNoMovesTooltip: true);
         }
 
         private void ClearCurrentSelection()
@@ -288,7 +296,93 @@ namespace Game.Gameplay.Core
             }
 
             _boardView.SetAdditions(_remainingAdditions);
-            _boardView.SetPlusButtonInteractable(_remainingAdditions > 0);
+            _boardView.SetPlusButtonInteractable(CanUsePlus());
+        }
+
+        private void EvaluateSessionState(bool showNoMovesTooltip)
+        {
+            if (_boardState == null || _boardView == null)
+            {
+                return;
+            }
+
+            GameSessionState nextState;
+            if (HasValidPairs())
+            {
+                nextState = GameSessionState.Playing;
+            }
+            else if (CanUsePlus())
+            {
+                nextState = GameSessionState.NoMovesAvailable;
+            }
+            else
+            {
+                nextState = GameSessionState.GameOver;
+            }
+
+            if (nextState == _sessionState)
+            {
+                return;
+            }
+
+            _sessionState = nextState;
+
+            if (_sessionState == GameSessionState.Playing)
+            {
+                _boardView.HideGameOver();
+                return;
+            }
+
+            if (_sessionState == GameSessionState.NoMovesAvailable)
+            {
+                if (showNoMovesTooltip)
+                {
+                    _boardView.ShowTooltip("No more pairs. Please tap '+' button to add numbers.");
+                }
+
+                Debug.Log(
+                    $"GameplayController: No moves available. '+' can still continue the run. " +
+                    $"{_remainingAdditions} additions remaining.");
+                return;
+            }
+
+            ClearCurrentSelection();
+            ClearHint();
+            _boardView.ShowGameOver(_scoreService.TotalScore, _stageState.Stage);
+
+            Debug.Log(
+                $"GameplayController: Game Over. Final score {_scoreService.TotalScore}, " +
+                $"final stage {_stageState.Stage}.");
+        }
+
+        private bool HasValidPairs()
+        {
+            List<BoardMatchInfo> pairs = _boardPairFinder.FindAll(_boardState.Cells, _columns);
+            return pairs.Count > 0;
+        }
+
+        private bool CanUsePlus()
+        {
+            if (_remainingAdditions <= 0 || _boardState == null)
+            {
+                return false;
+            }
+
+            IReadOnlyList<BoardCell> cells = _boardState.Cells;
+            for (int index = 0; index < cells.Count; index++)
+            {
+                if (!cells[index].IsMatched)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void OnRestartClicked()
+        {
+            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }
 
         private string DescribeCell(BoardCell cell)

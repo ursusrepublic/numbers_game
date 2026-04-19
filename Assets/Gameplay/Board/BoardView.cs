@@ -20,6 +20,7 @@ namespace Game.Gameplay.Board
         public event Action<int> TileClicked;
         public event Action PlusClicked;
         public event Action HintClicked;
+        public event Action RestartClicked;
 
         private readonly List<BoardTileView> _tiles = new();
         private readonly HashSet<int> _hintedIndices = new();
@@ -37,6 +38,12 @@ namespace Game.Gameplay.Board
         private Text _tooltipLabel;
         private Text _plusButtonLabel;
         private Text _hintButtonLabel;
+        private GameObject _gameOverOverlay;
+        private Text _gameOverScoreLabel;
+        private Text _gameOverStageLabel;
+        private Button _restartButton;
+        private Image _restartButtonImage;
+        private Text _restartButtonLabel;
         private Font _labelFont;
         private Coroutine _tooltipRoutine;
         private int _columns;
@@ -145,6 +152,52 @@ namespace Game.Gameplay.Board
             scrollRect.movementType = ScrollRect.MovementType.Clamped;
             scrollRect.scrollSensitivity = 24f;
 
+            var overlayObject = new GameObject(
+                "GameOverOverlay",
+                typeof(RectTransform),
+                typeof(Image));
+
+            overlayObject.transform.SetParent(parent, false);
+
+            var overlayRect = (RectTransform)overlayObject.transform;
+            overlayRect.anchorMin = Vector2.zero;
+            overlayRect.anchorMax = Vector2.one;
+            overlayRect.offsetMin = Vector2.zero;
+            overlayRect.offsetMax = Vector2.zero;
+
+            var overlayImage = overlayObject.GetComponent<Image>();
+            overlayImage.color = new Color(0.05f, 0.06f, 0.09f, 0.84f);
+
+            var panelObject = new GameObject(
+                "GameOverPanel",
+                typeof(RectTransform),
+                typeof(Image));
+
+            panelObject.transform.SetParent(overlayObject.transform, false);
+
+            var panelRect = (RectTransform)panelObject.transform;
+            panelRect.anchorMin = new Vector2(0.5f, 0.5f);
+            panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+            panelRect.pivot = new Vector2(0.5f, 0.5f);
+            panelRect.sizeDelta = new Vector2(700f, 480f);
+            panelRect.anchoredPosition = Vector2.zero;
+
+            var panelImage = panelObject.GetComponent<Image>();
+            panelImage.color = HudPanelColor;
+
+            Text titleLabel = CreateTextElement(panelObject.transform, "TitleLabel");
+            ConfigureRect((RectTransform)titleLabel.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(520f, 72f), new Vector2(0f, -60f));
+            titleLabel.text = "Game Over";
+
+            Text gameOverScoreLabel = CreateTextElement(panelObject.transform, "ScoreLabel");
+            ConfigureRect((RectTransform)gameOverScoreLabel.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(520f, 56f), new Vector2(0f, -160f));
+
+            Text gameOverStageLabel = CreateTextElement(panelObject.transform, "StageLabel");
+            ConfigureRect((RectTransform)gameOverStageLabel.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(520f, 56f), new Vector2(0f, -230f));
+
+            (Button restartButton, Image restartButtonImage, Text restartButtonLabel) = CreateButton(panelObject.transform, "RestartButton", "Restart");
+            ConfigureRect((RectTransform)restartButton.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(260f, 64f), new Vector2(0f, 54f));
+
             var boardView = scrollViewObject.GetComponent<BoardView>();
             boardView.Setup(
                 viewportRect,
@@ -160,6 +213,13 @@ namespace Game.Gameplay.Board
                 hintButton,
                 hintButtonImage,
                 hintButtonLabel,
+                overlayObject,
+                gameOverScoreLabel,
+                gameOverStageLabel,
+                restartButton,
+                restartButtonImage,
+                restartButtonLabel,
+                titleLabel,
                 columns);
 
             return boardView;
@@ -332,6 +392,39 @@ namespace Game.Gameplay.Board
             }
         }
 
+        public void ShowGameOver(int finalScore, int finalStage)
+        {
+            if (_gameOverOverlay == null || _gameOverScoreLabel == null || _gameOverStageLabel == null)
+            {
+                return;
+            }
+
+            if (_tooltipRoutine != null)
+            {
+                StopCoroutine(_tooltipRoutine);
+                _tooltipRoutine = null;
+            }
+
+            if (_tooltipLabel != null)
+            {
+                _tooltipLabel.enabled = false;
+                _tooltipLabel.text = string.Empty;
+            }
+
+            _gameOverScoreLabel.text = $"Final Score: {finalScore}";
+            _gameOverStageLabel.text = $"Final Stage: {finalStage}";
+            _gameOverOverlay.SetActive(true);
+            _gameOverOverlay.transform.SetAsLastSibling();
+        }
+
+        public void HideGameOver()
+        {
+            if (_gameOverOverlay != null)
+            {
+                _gameOverOverlay.SetActive(false);
+            }
+        }
+
         private void LateUpdate()
         {
             if (_viewportRect == null)
@@ -360,6 +453,11 @@ namespace Game.Gameplay.Board
             {
                 _hintButton.onClick.RemoveListener(HandleHintClicked);
             }
+
+            if (_restartButton != null)
+            {
+                _restartButton.onClick.RemoveListener(HandleRestartClicked);
+            }
         }
 
         private void Setup(
@@ -376,6 +474,13 @@ namespace Game.Gameplay.Board
             Button hintButton,
             Image hintButtonImage,
             Text hintButtonLabel,
+            GameObject gameOverOverlay,
+            Text gameOverScoreLabel,
+            Text gameOverStageLabel,
+            Button restartButton,
+            Image restartButtonImage,
+            Text restartButtonLabel,
+            Text gameOverTitleLabel,
             int columns)
         {
             _viewportRect = viewportRect;
@@ -391,6 +496,12 @@ namespace Game.Gameplay.Board
             _hintButton = hintButton;
             _hintButtonImage = hintButtonImage;
             _hintButtonLabel = hintButtonLabel;
+            _gameOverOverlay = gameOverOverlay;
+            _gameOverScoreLabel = gameOverScoreLabel;
+            _gameOverStageLabel = gameOverStageLabel;
+            _restartButton = restartButton;
+            _restartButtonImage = restartButtonImage;
+            _restartButtonLabel = restartButtonLabel;
             _columns = Mathf.Max(1, columns);
             _labelFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
@@ -402,14 +513,20 @@ namespace Game.Gameplay.Board
 
             ConfigureLabel(_plusButtonLabel, 34, TextAnchor.MiddleCenter, TextColor);
             ConfigureLabel(_hintButtonLabel, 28, TextAnchor.MiddleCenter, TextColor);
+            ConfigureLabel(gameOverTitleLabel, 48, TextAnchor.MiddleCenter, TextColor);
+            ConfigureLabel(_gameOverScoreLabel, 34, TextAnchor.MiddleCenter, TextColor);
+            ConfigureLabel(_gameOverStageLabel, 34, TextAnchor.MiddleCenter, new Color(0.86f, 0.90f, 0.96f, 1f));
+            ConfigureLabel(_restartButtonLabel, 34, TextAnchor.MiddleCenter, TextColor);
 
             _plusButton.onClick.AddListener(HandlePlusClicked);
             _hintButton.onClick.AddListener(HandleHintClicked);
+            _restartButton.onClick.AddListener(HandleRestartClicked);
 
             SetScore(0);
             SetAdditions(0);
             SetPlusButtonInteractable(true);
             SetHintButtonLocked(false);
+            HideGameOver();
         }
 
         private void EnsureTileCount(int requiredCount)
@@ -434,6 +551,11 @@ namespace Game.Gameplay.Board
         private void HandleHintClicked()
         {
             HintClicked?.Invoke();
+        }
+
+        private void HandleRestartClicked()
+        {
+            RestartClicked?.Invoke();
         }
 
         private void RefreshHintTiles()
