@@ -20,12 +20,15 @@ namespace Game.Gameplay.Core
         private BoardPairFinder _boardPairFinder;
         private ScoreService _scoreService;
         private StageState _stageState;
+        private System.Random _boardSeedRandom;
         private System.Random _runtimeRandom;
         private BoardMatchInfo _hintedPair;
         private int? _selectedCellIndex;
         private int _columns;
+        private int _initialRows;
+        private int _startingPairs;
+        private int _startingAdditions;
         private int _remainingAdditions;
-        private int _additionsPerBoardClear;
         private GameSessionState _sessionState;
 
         public void Initialize(
@@ -33,26 +36,23 @@ namespace Game.Gameplay.Core
             int initialRows,
             int startingPairs,
             int randomSeed,
-            int startingAdditions,
-            int additionsPerBoardClear)
+            int startingAdditions)
         {
             _columns = Mathf.Max(1, columns);
-            int safeRows = Mathf.Max(1, initialRows);
-            int maxStartingPairs = (_columns * safeRows) / 2;
-            int safeStartingPairs = Mathf.Clamp(startingPairs, 0, maxStartingPairs);
+            _initialRows = Mathf.Max(1, initialRows);
+            int maxStartingPairs = (_columns * _initialRows) / 2;
+            _startingPairs = Mathf.Clamp(startingPairs, 0, maxStartingPairs);
             int actualSeed = randomSeed == 0 ? Environment.TickCount : randomSeed;
 
             _boardMatchRules = new BoardMatchRules();
             _boardPairFinder = new BoardPairFinder(_boardMatchRules);
+            _boardSeedRandom = new System.Random(actualSeed ^ 0x51F2D4A);
             _runtimeRandom = new System.Random(actualSeed ^ 0x3F2A5C7);
-
-            var generator = new BoardGenerator(actualSeed);
-            List<BoardCell> generatedCells = generator.Generate(_columns, safeRows, safeStartingPairs);
-            _boardState = new BoardState(generatedCells, _columns, _boardMatchRules);
+            _boardState = CreateBoardState(actualSeed);
             _scoreService = new ScoreService();
             _stageState = new StageState();
-            _remainingAdditions = Mathf.Max(0, startingAdditions);
-            _additionsPerBoardClear = Mathf.Max(0, additionsPerBoardClear);
+            _startingAdditions = Mathf.Max(0, startingAdditions);
+            _remainingAdditions = _startingAdditions;
 
             EnsureEventSystem();
 
@@ -71,7 +71,7 @@ namespace Game.Gameplay.Core
 
             Debug.Log(
                 $"GameplayController: Generated a scrollable board with {_boardState.Cells.Count} cells, " +
-                $"{safeRows} rows, {_columns} columns, {safeStartingPairs} starting pairs and seed {actualSeed}.");
+                $"{_initialRows} rows, {_columns} columns, {_startingPairs} starting pairs and seed {actualSeed}.");
             Debug.Log(
                 $"GameplayController: Stage {_stageState.Stage}, score {_scoreService.TotalScore}, " +
                 $"future multiplier x{_stageState.Multiplier}, additions {_remainingAdditions}.");
@@ -238,13 +238,14 @@ namespace Game.Gameplay.Core
             if (resolution.BoardCleared)
             {
                 _stageState.AdvanceAfterBoardClear();
-                _remainingAdditions += _additionsPerBoardClear;
+                _remainingAdditions = _startingAdditions;
                 UpdateAdditionsUi();
-                _boardView.ShowTooltip($"Board cleared. Stage {_stageState.Stage}. +{_additionsPerBoardClear} additions.");
+                StartNextStageBoard();
+                _boardView.ShowTooltip($"Board cleared. Stage {_stageState.Stage}. Additions reset to {_startingAdditions}.");
 
                 Debug.Log(
                     $"GameplayController: Board cleared. Stage is now {_stageState.Stage}. " +
-                    $"{_additionsPerBoardClear} additions awarded. Future matches use multiplier x{_stageState.Multiplier}.");
+                    $"Additions reset to {_startingAdditions}. Future matches use multiplier x{_stageState.Multiplier}.");
             }
             else if (resolution.NewlyClearedRowCount > 0)
             {
@@ -254,7 +255,7 @@ namespace Game.Gameplay.Core
                     $"Rows below shifted up.");
             }
 
-            EvaluateSessionState(showNoMovesTooltip: true);
+            EvaluateSessionState(showNoMovesTooltip: !resolution.BoardCleared);
         }
 
         private void ClearCurrentSelection()
@@ -297,6 +298,26 @@ namespace Game.Gameplay.Core
 
             _boardView.SetAdditions(_remainingAdditions);
             _boardView.SetPlusButtonInteractable(CanUsePlus());
+        }
+
+        private BoardState CreateBoardState(int seed)
+        {
+            var generator = new BoardGenerator(seed);
+            List<BoardCell> generatedCells = generator.Generate(_columns, _initialRows, _startingPairs);
+            return new BoardState(generatedCells, _columns, _boardMatchRules);
+        }
+
+        private void StartNextStageBoard()
+        {
+            int nextBoardSeed = _boardSeedRandom.Next();
+            _boardState = CreateBoardState(nextBoardSeed);
+            UpdateAdditionsUi();
+            _boardView.SetCells(_boardState.Cells);
+            _boardView.ScrollToTop();
+
+            Debug.Log(
+                $"GameplayController: Generated stage {_stageState.Stage} board with {_boardState.Cells.Count} cells, " +
+                $"{_initialRows} rows, {_columns} columns, {_startingPairs} starting pairs and seed {nextBoardSeed}.");
         }
 
         private void EvaluateSessionState(bool showNoMovesTooltip)

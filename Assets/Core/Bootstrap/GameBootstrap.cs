@@ -12,9 +12,8 @@ namespace Game.Core.Bootstrap
         [SerializeField] [Min(0)] private int _startingPairs = 8;
         [SerializeField] private int _randomSeed;
 
-        [Header("Booster Settings")]
+        [Header("Additions Settings")]
         [SerializeField] [Min(0)] private int _startingAdditions = 5;
-        [SerializeField] [Min(0)] private int _additionsPerBoardClear = 5;
 
         private void Awake()
         {
@@ -32,8 +31,7 @@ namespace Game.Core.Bootstrap
                 _initialRows,
                 _startingPairs,
                 _randomSeed,
-                _startingAdditions,
-                _additionsPerBoardClear);
+                _startingAdditions);
         }
     }
 }
