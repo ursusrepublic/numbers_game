@@ -1,5 +1,5 @@
+using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace Game.Gameplay.Board
 {
@@ -8,24 +8,12 @@ namespace Game.Gameplay.Board
         private readonly List<BoardCell> _cells;
         private readonly int _columns;
         private readonly BoardMatchRules _matchRules;
-        private readonly HashSet<int> _clearedRows;
-        private int _matchedCellCount;
 
         public BoardState(IEnumerable<BoardCell> cells, int columns, BoardMatchRules matchRules)
         {
             _cells = new List<BoardCell>(cells);
             _columns = columns;
             _matchRules = matchRules;
-            _clearedRows = new HashSet<int>();
-            _matchedCellCount = _cells.Count(cell => cell.IsMatched);
-
-            for (int row = 0; row < GetRowCount(); row++)
-            {
-                if (IsRowCleared(row))
-                {
-                    _clearedRows.Add(row);
-                }
-            }
         }
 
         public IReadOnlyList<BoardCell> Cells => _cells;
@@ -47,7 +35,13 @@ namespace Game.Gameplay.Board
 
         public BoardMatchResolution TryMatchPair(int firstIndex, int secondIndex)
         {
-            if (!_matchRules.TryGetMatchInfo(_cells, _columns, firstIndex, secondIndex, out BoardMatchInfo matchInfo, out string failureReason))
+            if (!_matchRules.TryGetMatchInfo(
+                    _cells,
+                    _columns,
+                    firstIndex,
+                    secondIndex,
+                    out BoardMatchInfo matchInfo,
+                    out string failureReason))
             {
                 return BoardMatchResolution.Failed(failureReason);
             }
@@ -58,17 +52,46 @@ namespace Game.Gameplay.Board
             _cells[secondIndex].IsMatched = true;
             _cells[secondIndex].IsSelected = false;
 
-            _matchedCellCount += 2;
+            List<int> rowsToRemove = GetMatchedRows(firstIndex, secondIndex);
+            int removedRowCount = rowsToRemove.Count;
 
-            int newlyClearedRowCount = CountNewlyClearedRows(firstIndex, secondIndex);
-            bool boardCleared = _matchedCellCount >= _cells.Count;
+            if (removedRowCount > 0)
+            {
+                RemoveRows(rowsToRemove);
+            }
+
+            bool boardCleared = AreAllCellsMatched();
 
             return BoardMatchResolution.Succeeded(
                 matchInfo,
                 firstIndex,
                 secondIndex,
-                newlyClearedRowCount,
+                removedRowCount,
                 boardCleared);
+        }
+
+        public int DuplicateUnmatchedNumbers()
+        {
+            var numbersToDuplicate = new List<int>();
+            for (int index = 0; index < _cells.Count; index++)
+            {
+                if (_cells[index].IsMatched)
+                {
+                    continue;
+                }
+
+                numbersToDuplicate.Add(_cells[index].Number);
+            }
+
+            for (int index = 0; index < numbersToDuplicate.Count; index++)
+            {
+                int newIndex = _cells.Count;
+                int row = newIndex / _columns;
+                int column = newIndex % _columns;
+                _cells.Add(new BoardCell(newIndex, row, column, numbersToDuplicate[index]));
+            }
+
+            return numbersToDuplicate.Count;
         }
 
         private bool IsValidIndex(int index)
@@ -76,38 +99,40 @@ namespace Game.Gameplay.Board
             return index >= 0 && index < _cells.Count;
         }
 
-        private int CountNewlyClearedRows(int firstIndex, int secondIndex)
+        private List<int> GetMatchedRows(int firstIndex, int secondIndex)
         {
-            var candidateRows = new HashSet<int>
+            var rowsToCheck = new HashSet<int>
             {
                 _cells[firstIndex].Row,
                 _cells[secondIndex].Row,
             };
 
-            int clearedRowCount = 0;
-            foreach (int row in candidateRows)
+            var matchedRows = new List<int>();
+            foreach (int row in rowsToCheck)
             {
-                if (_clearedRows.Contains(row))
+                if (IsRowMatched(row))
                 {
-                    continue;
+                    matchedRows.Add(row);
                 }
-
-                if (!IsRowCleared(row))
-                {
-                    continue;
-                }
-
-                _clearedRows.Add(row);
-                clearedRowCount++;
             }
 
-            return clearedRowCount;
+            matchedRows.Sort();
+            return matchedRows;
         }
 
-        private bool IsRowCleared(int row)
+        private bool IsRowMatched(int row)
         {
             int startIndex = row * _columns;
-            int endIndex = System.Math.Min(startIndex + _columns, _cells.Count);
+            if (startIndex < 0 || startIndex >= _cells.Count)
+            {
+                return false;
+            }
+
+            int endIndex = startIndex + _columns;
+            if (endIndex > _cells.Count)
+            {
+                return false;
+            }
 
             for (int index = startIndex; index < endIndex; index++)
             {
@@ -120,14 +145,55 @@ namespace Game.Gameplay.Board
             return true;
         }
 
-        private int GetRowCount()
+        private bool AreAllCellsMatched()
         {
-            if (_columns <= 0)
+            for (int index = 0; index < _cells.Count; index++)
             {
-                return 0;
+                if (!_cells[index].IsMatched)
+                {
+                    return false;
+                }
             }
 
-            return (_cells.Count + _columns - 1) / _columns;
+            return true;
+        }
+
+        private void RemoveRows(IReadOnlyList<int> rows)
+        {
+            for (int rowIndex = rows.Count - 1; rowIndex >= 0; rowIndex--)
+            {
+                int row = rows[rowIndex];
+                int startIndex = row * _columns;
+                int count = Math.Min(_columns, _cells.Count - startIndex);
+
+                if (startIndex < 0 || count <= 0)
+                {
+                    continue;
+                }
+
+                _cells.RemoveRange(startIndex, count);
+            }
+
+            RebuildCells();
+        }
+
+        private void RebuildCells()
+        {
+            for (int index = 0; index < _cells.Count; index++)
+            {
+                BoardCell oldCell = _cells[index];
+                var rebuiltCell = new BoardCell(
+                    index,
+                    index / _columns,
+                    index % _columns,
+                    oldCell.Number)
+                {
+                    IsMatched = oldCell.IsMatched,
+                    IsSelected = oldCell.IsSelected,
+                };
+
+                _cells[index] = rebuiltCell;
+            }
         }
     }
 }

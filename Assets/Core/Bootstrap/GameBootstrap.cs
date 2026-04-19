@@ -7,10 +7,14 @@ namespace Game.Core.Bootstrap
     public sealed class GameBootstrap : MonoBehaviour
     {
         [Header("Board Settings")]
-        [SerializeField] [Min(1)] private int _boardColumns = 6;
+        [SerializeField] [Min(1)] private int _boardColumns = 9;
         [SerializeField] [Min(1)] private int _initialRows = 3;
         [SerializeField] [Min(0)] private int _startingPairs = 8;
         [SerializeField] private int _randomSeed;
+
+        [Header("Booster Settings")]
+        [SerializeField] [Min(0)] private int _startingAdditions = 5;
+        [SerializeField] [Min(0)] private int _additionsPerBoardClear = 5;
 
         private void Awake()
         {
@@ -23,7 +27,13 @@ namespace Game.Core.Bootstrap
             gameplayRoot.transform.SetParent(transform, false);
 
             var gameplayController = gameplayRoot.AddComponent<GameplayController>();
-            gameplayController.Initialize(_boardColumns, _initialRows, _startingPairs, _randomSeed);
+            gameplayController.Initialize(
+                _boardColumns,
+                _initialRows,
+                _startingPairs,
+                _randomSeed,
+                _startingAdditions,
+                _additionsPerBoardClear);
         }
     }
 }
