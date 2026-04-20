@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using Game.Core;
 using Game.Gameplay.Board;
+using Game.Gameplay.Dev;
 using Game.Gameplay.Score;
 using Game.Gameplay.Stage;
 using UnityEngine;
@@ -16,6 +18,7 @@ namespace Game.Gameplay.Core
     {
         private BoardState _boardState;
         private BoardView _boardView;
+        private DevPanelView _devPanelView;
         private BoardMatchRules _boardMatchRules;
         private BoardPairFinder _boardPairFinder;
         private ScoreService _scoreService;
@@ -23,7 +26,9 @@ namespace Game.Gameplay.Core
         private System.Random _boardSeedRandom;
         private System.Random _runtimeRandom;
         private BoardMatchInfo _hintedPair;
+        private AppMode _appMode;
         private int? _selectedCellIndex;
+        private int _currentBoardSeed;
         private int _columns;
         private int _initialRows;
         private int _startingPairs;
@@ -32,12 +37,14 @@ namespace Game.Gameplay.Core
         private GameSessionState _sessionState;
 
         public void Initialize(
+            AppMode appMode,
             int columns,
             int initialRows,
             int startingPairs,
             int randomSeed,
             int startingAdditions)
         {
+            _appMode = appMode;
             _columns = Mathf.Max(1, columns);
             _initialRows = Mathf.Max(1, initialRows);
             int maxStartingPairs = (_columns * _initialRows) / 2;
@@ -69,9 +76,17 @@ namespace Game.Gameplay.Core
             _boardView.SetHintButtonLocked(false);
             _boardView.HideGameOver();
 
+            if (_appMode == AppMode.Developer)
+            {
+                _devPanelView = DevPanelView.Create(canvasTransform);
+                _devPanelView.ShowPairsClicked += OnShowDeveloperPairsClicked;
+                _devPanelView.SolveOnePairClicked += OnSolveOnePairClicked;
+            }
+
             Debug.Log(
                 $"GameplayController: Generated a scrollable board with {_boardState.Cells.Count} cells, " +
-                $"{_initialRows} rows, {_columns} columns, {_startingPairs} starting pairs and seed {actualSeed}.");
+                $"{_initialRows} rows, {_columns} columns, {_startingPairs} starting pairs and seed {actualSeed}. " +
+                $"Mode {_appMode}.");
             Debug.Log(
                 $"GameplayController: Stage {_stageState.Stage}, score {_scoreService.TotalScore}, " +
                 $"future multiplier x{_stageState.Multiplier}, additions {_remainingAdditions}.");
@@ -80,6 +95,7 @@ namespace Game.Gameplay.Core
                 "and tap Hint to highlight a random valid pair.");
 
             EvaluateSessionState(showNoMovesTooltip: true);
+            UpdateDeveloperInfo();
         }
 
         private void OnDestroy()
@@ -90,6 +106,12 @@ namespace Game.Gameplay.Core
                 _boardView.PlusClicked -= OnPlusClicked;
                 _boardView.HintClicked -= OnHintClicked;
                 _boardView.RestartClicked -= OnRestartClicked;
+            }
+
+            if (_devPanelView != null)
+            {
+                _devPanelView.ShowPairsClicked -= OnShowDeveloperPairsClicked;
+                _devPanelView.SolveOnePairClicked -= OnSolveOnePairClicked;
             }
         }
 
@@ -149,6 +171,7 @@ namespace Game.Gameplay.Core
             }
 
             ClearCurrentSelection();
+            ClearDeveloperPairLines();
 
             int addedCount = _boardState.DuplicateUnmatchedNumbers();
             if (addedCount <= 0)
@@ -169,6 +192,7 @@ namespace Game.Gameplay.Core
                 $"{_remainingAdditions} additions remaining.");
 
             EvaluateSessionState(showNoMovesTooltip: true);
+            UpdateDeveloperInfo();
         }
 
         private void OnHintClicked()
@@ -207,6 +231,7 @@ namespace Game.Gameplay.Core
         {
             _selectedCellIndex = null;
             ClearHint();
+            ClearDeveloperPairLines();
 
             if (resolution.NewlyClearedRowCount > 0)
             {
@@ -256,6 +281,7 @@ namespace Game.Gameplay.Core
             }
 
             EvaluateSessionState(showNoMovesTooltip: !resolution.BoardCleared);
+            UpdateDeveloperInfo();
         }
 
         private void ClearCurrentSelection()
@@ -302,6 +328,7 @@ namespace Game.Gameplay.Core
 
         private BoardState CreateBoardState(int seed)
         {
+            _currentBoardSeed = seed;
             var generator = new BoardGenerator(seed);
             List<BoardCell> generatedCells = generator.Generate(_columns, _initialRows, _startingPairs);
             return new BoardState(generatedCells, _columns, _boardMatchRules);
@@ -318,6 +345,68 @@ namespace Game.Gameplay.Core
             Debug.Log(
                 $"GameplayController: Generated stage {_stageState.Stage} board with {_boardState.Cells.Count} cells, " +
                 $"{_initialRows} rows, {_columns} columns, {_startingPairs} starting pairs and seed {nextBoardSeed}.");
+        }
+
+        private void OnShowDeveloperPairsClicked()
+        {
+            if (_boardState == null || _boardView == null)
+            {
+                return;
+            }
+
+            List<BoardMatchInfo> pairs = GetValidPairs();
+            if (pairs.Count == 0)
+            {
+                _boardView.ClearDeveloperPairLines();
+                _boardView.ShowTooltip("Developer: no valid pairs on the current board.");
+                UpdateDeveloperInfo(0);
+                return;
+            }
+
+            _boardView.ShowDeveloperPairLines(pairs);
+            _boardView.ShowTooltip($"Developer: showing {pairs.Count} valid pair(s).");
+            UpdateDeveloperInfo(pairs.Count);
+        }
+
+        private void OnSolveOnePairClicked()
+        {
+            if (_sessionState == GameSessionState.GameOver || _boardState == null || _boardView == null)
+            {
+                return;
+            }
+
+            List<BoardMatchInfo> pairs = GetValidPairs();
+            if (pairs.Count == 0)
+            {
+                _boardView.ShowTooltip("Developer: no valid pairs to solve.");
+                UpdateDeveloperInfo(0);
+                return;
+            }
+
+            BoardMatchInfo pairToSolve = pairs[_runtimeRandom.Next(pairs.Count)];
+            ClearCurrentSelection();
+            ClearHint();
+            ClearDeveloperPairLines();
+
+            BoardCell firstCell = _boardState.Cells[pairToSolve.FirstIndex];
+            BoardCell secondCell = _boardState.Cells[pairToSolve.SecondIndex];
+            BoardMatchResolution resolution = _boardState.TryMatchPair(pairToSolve.FirstIndex, pairToSolve.SecondIndex);
+            if (!resolution.Success)
+            {
+                _boardView.ShowTooltip("Developer: failed to solve the selected pair.");
+                UpdateDeveloperInfo();
+                return;
+            }
+
+            bool showSolvedTooltip = !resolution.BoardCleared && resolution.NewlyClearedRowCount == 0;
+            Debug.Log(
+                $"GameplayController: Developer solved {DescribeCell(firstCell)} with {DescribeCell(secondCell)}.");
+            HandleSuccessfulMatch(resolution, firstCell, secondCell);
+
+            if (showSolvedTooltip)
+            {
+                _boardView.ShowTooltip("Developer: solved one valid pair.");
+            }
         }
 
         private void EvaluateSessionState(bool showNoMovesTooltip)
@@ -376,9 +465,14 @@ namespace Game.Gameplay.Core
                 $"final stage {_stageState.Stage}.");
         }
 
+        private List<BoardMatchInfo> GetValidPairs()
+        {
+            return _boardPairFinder.FindAll(_boardState.Cells, _columns);
+        }
+
         private bool HasValidPairs()
         {
-            List<BoardMatchInfo> pairs = _boardPairFinder.FindAll(_boardState.Cells, _columns);
+            List<BoardMatchInfo> pairs = GetValidPairs();
             return pairs.Count > 0;
         }
 
@@ -399,6 +493,28 @@ namespace Game.Gameplay.Core
             }
 
             return false;
+        }
+
+        private void ClearDeveloperPairLines()
+        {
+            _boardView?.ClearDeveloperPairLines();
+        }
+
+        private void UpdateDeveloperInfo(int? validPairCount = null)
+        {
+            if (_appMode != AppMode.Developer || _devPanelView == null || _boardState == null)
+            {
+                return;
+            }
+
+            int pairsCount = validPairCount ?? GetValidPairs().Count;
+            _devPanelView.SetInfo(
+                $"Mode: {_appMode}\n" +
+                $"Seed: {_currentBoardSeed}\n" +
+                $"Score: {_scoreService.TotalScore}\n" +
+                $"Stage: {_stageState.Stage}\n" +
+                $"Additions: {_remainingAdditions}\n" +
+                $"Valid Pairs: {pairsCount}");
         }
 
         private void OnRestartClicked()

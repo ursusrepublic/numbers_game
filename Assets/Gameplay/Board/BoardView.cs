@@ -15,6 +15,7 @@ namespace Game.Gameplay.Board
         private static readonly Color LockedButtonColor = new Color(0.28f, 0.44f, 0.60f, 0.95f);
         private static readonly Color DisabledButtonColor = new Color(0.30f, 0.32f, 0.38f, 0.9f);
         private static readonly Color TooltipColor = new Color(1f, 0.93f, 0.70f, 1f);
+        private static readonly Color DeveloperPairLineColor = new Color(1f, 0.42f, 0.18f, 0.55f);
         private static readonly Color TextColor = Color.white;
 
         public event Action<int> TileClicked;
@@ -24,9 +25,12 @@ namespace Game.Gameplay.Board
 
         private readonly List<BoardTileView> _tiles = new();
         private readonly HashSet<int> _hintedIndices = new();
+        private readonly List<RectTransform> _developerLineRects = new();
+        private readonly List<BoardMatchInfo> _developerPairs = new();
 
         private RectTransform _viewportRect;
         private RectTransform _contentRect;
+        private RectTransform _effectsRect;
         private GridLayoutGroup _gridLayoutGroup;
         private ScrollRect _scrollRect;
         private Button _plusButton;
@@ -137,6 +141,22 @@ namespace Game.Gameplay.Board
             contentRect.pivot = new Vector2(0.5f, 1f);
             contentRect.anchoredPosition = Vector2.zero;
 
+            var effectsObject = new GameObject(
+                "BoardEffects",
+                typeof(RectTransform),
+                typeof(LayoutElement));
+
+            effectsObject.transform.SetParent(contentObject.transform, false);
+
+            var effectsRect = (RectTransform)effectsObject.transform;
+            effectsRect.anchorMin = Vector2.zero;
+            effectsRect.anchorMax = Vector2.one;
+            effectsRect.offsetMin = Vector2.zero;
+            effectsRect.offsetMax = Vector2.zero;
+
+            var effectsLayout = effectsObject.GetComponent<LayoutElement>();
+            effectsLayout.ignoreLayout = true;
+
             var gridLayoutGroup = contentObject.GetComponent<GridLayoutGroup>();
             gridLayoutGroup.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             gridLayoutGroup.constraintCount = Mathf.Max(1, columns);
@@ -202,6 +222,7 @@ namespace Game.Gameplay.Board
             boardView.Setup(
                 viewportRect,
                 contentRect,
+                effectsRect,
                 gridLayoutGroup,
                 scrollRect,
                 scoreLabel,
@@ -242,6 +263,11 @@ namespace Game.Gameplay.Board
             {
                 _tiles[index].SetHinted(false);
                 _tiles[index].gameObject.SetActive(false);
+            }
+
+            if (_effectsRect != null)
+            {
+                _effectsRect.SetAsLastSibling();
             }
 
             Canvas.ForceUpdateCanvases();
@@ -392,6 +418,27 @@ namespace Game.Gameplay.Board
             }
         }
 
+        public void ShowDeveloperPairLines(IReadOnlyList<BoardMatchInfo> pairs)
+        {
+            _developerPairs.Clear();
+            for (int index = 0; index < pairs.Count; index++)
+            {
+                _developerPairs.Add(pairs[index]);
+            }
+
+            RefreshDeveloperPairLines();
+        }
+
+        public void ClearDeveloperPairLines()
+        {
+            _developerPairs.Clear();
+
+            for (int index = 0; index < _developerLineRects.Count; index++)
+            {
+                _developerLineRects[index].gameObject.SetActive(false);
+            }
+        }
+
         public void ShowGameOver(int finalScore, int finalStage)
         {
             if (_gameOverOverlay == null || _gameOverScoreLabel == null || _gameOverStageLabel == null)
@@ -463,6 +510,7 @@ namespace Game.Gameplay.Board
         private void Setup(
             RectTransform viewportRect,
             RectTransform contentRect,
+            RectTransform effectsRect,
             GridLayoutGroup gridLayoutGroup,
             ScrollRect scrollRect,
             Text scoreLabel,
@@ -485,6 +533,7 @@ namespace Game.Gameplay.Board
         {
             _viewportRect = viewportRect;
             _contentRect = contentRect;
+            _effectsRect = effectsRect;
             _gridLayoutGroup = gridLayoutGroup;
             _scrollRect = scrollRect;
             _scoreLabel = scoreLabel;
@@ -602,6 +651,7 @@ namespace Game.Gameplay.Board
             if (_cellCount == 0)
             {
                 _contentRect.sizeDelta = new Vector2(0f, Mathf.Max(0f, _viewportRect.rect.height));
+                ClearDeveloperPairLines();
                 return;
             }
 
@@ -627,6 +677,11 @@ namespace Game.Gameplay.Board
                 + (Mathf.Max(0, rows - 1) * _gridLayoutGroup.spacing.y);
 
             _contentRect.sizeDelta = new Vector2(0f, Mathf.Max(_viewportRect.rect.height, contentHeight));
+
+            if (_developerPairs.Count > 0)
+            {
+                RefreshDeveloperPairLines();
+            }
         }
 
         private IEnumerator HideTooltipAfterDelay(float duration)
@@ -636,6 +691,104 @@ namespace Game.Gameplay.Board
             _tooltipLabel.enabled = false;
             _tooltipLabel.text = string.Empty;
             _tooltipRoutine = null;
+        }
+
+        private void RefreshDeveloperPairLines()
+        {
+            if (_effectsRect == null)
+            {
+                return;
+            }
+
+            if (_developerPairs.Count == 0)
+            {
+                ClearDeveloperPairLines();
+                return;
+            }
+
+            Canvas.ForceUpdateCanvases();
+            _effectsRect.SetAsLastSibling();
+            EnsureDeveloperLineCount(_developerPairs.Count);
+
+            for (int index = 0; index < _developerPairs.Count; index++)
+            {
+                RectTransform lineRect = _developerLineRects[index];
+                BoardMatchInfo pair = _developerPairs[index];
+
+                if (!TryPositionDeveloperLine(lineRect, pair.FirstIndex, pair.SecondIndex))
+                {
+                    lineRect.gameObject.SetActive(false);
+                }
+            }
+
+            for (int index = _developerPairs.Count; index < _developerLineRects.Count; index++)
+            {
+                _developerLineRects[index].gameObject.SetActive(false);
+            }
+        }
+
+        private void EnsureDeveloperLineCount(int requiredCount)
+        {
+            while (_developerLineRects.Count < requiredCount)
+            {
+                var lineObject = new GameObject(
+                    "DeveloperPairLine",
+                    typeof(RectTransform),
+                    typeof(Image),
+                    typeof(LayoutElement));
+
+                lineObject.transform.SetParent(_effectsRect, false);
+
+                var layoutElement = lineObject.GetComponent<LayoutElement>();
+                layoutElement.ignoreLayout = true;
+
+                var lineImage = lineObject.GetComponent<Image>();
+                lineImage.color = DeveloperPairLineColor;
+                lineImage.raycastTarget = false;
+
+                var lineRect = (RectTransform)lineObject.transform;
+                lineRect.anchorMin = new Vector2(0.5f, 0.5f);
+                lineRect.anchorMax = new Vector2(0.5f, 0.5f);
+                lineRect.pivot = new Vector2(0.5f, 0.5f);
+
+                _developerLineRects.Add(lineRect);
+            }
+        }
+
+        private bool TryPositionDeveloperLine(RectTransform lineRect, int firstIndex, int secondIndex)
+        {
+            if (lineRect == null || !TryGetTileCenter(firstIndex, out Vector2 firstCenter) || !TryGetTileCenter(secondIndex, out Vector2 secondCenter))
+            {
+                return false;
+            }
+
+            Vector2 difference = secondCenter - firstCenter;
+            float distance = difference.magnitude;
+            if (distance <= 0.5f)
+            {
+                return false;
+            }
+
+            lineRect.gameObject.SetActive(true);
+            lineRect.anchoredPosition = (firstCenter + secondCenter) * 0.5f;
+            lineRect.sizeDelta = new Vector2(distance, 8f);
+            lineRect.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(difference.y, difference.x) * Mathf.Rad2Deg);
+            return true;
+        }
+
+        private bool TryGetTileCenter(int index, out Vector2 center)
+        {
+            center = Vector2.zero;
+
+            if (index < 0 || index >= _cellCount || index >= _tiles.Count || _effectsRect == null)
+            {
+                return false;
+            }
+
+            var tileRect = (RectTransform)_tiles[index].transform;
+            Vector3 worldCenter = tileRect.TransformPoint(tileRect.rect.center);
+            center = _effectsRect.InverseTransformPoint(worldCenter);
+            return true;
         }
 
         private static Text CreateTextElement(Transform parent, string name)

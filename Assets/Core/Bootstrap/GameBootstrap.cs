@@ -1,3 +1,4 @@
+using Game.Core;
 using Game.Gameplay.Core;
 using UnityEngine;
 
@@ -6,6 +7,9 @@ namespace Game.Core.Bootstrap
     [DisallowMultipleComponent]
     public sealed class GameBootstrap : MonoBehaviour
     {
+        [Header("App")]
+        [SerializeField] private AppMode _appMode = AppMode.Player;
+
         [Header("Board Settings")]
         [SerializeField] [Min(1)] private int _boardColumns = 9;
         [SerializeField] [Min(1)] private int _initialRows = 3;
@@ -27,6 +31,7 @@ namespace Game.Core.Bootstrap
 
             var gameplayController = gameplayRoot.AddComponent<GameplayController>();
             gameplayController.Initialize(
+                _appMode,
                 _boardColumns,
                 _initialRows,
                 _startingPairs,

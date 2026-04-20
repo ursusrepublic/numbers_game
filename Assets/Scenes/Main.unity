@@ -369,6 +369,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fdd3695ddc92409cb5978bf7b011fd63, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _appMode: 0
   _boardColumns: 9
   _initialRows: 3
   _startingPairs: 8
