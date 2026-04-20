@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using Game.UI.Styling;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -8,13 +9,6 @@ namespace Game.Gameplay.Board
     [DisallowMultipleComponent]
     public sealed class BoardTileView : MonoBehaviour
     {
-        private static readonly Color NormalBackgroundColor = new Color(0.94f, 0.95f, 0.96f, 1f);
-        private static readonly Color SelectedBackgroundColor = new Color(1f, 0.84f, 0.32f, 1f);
-        private static readonly Color ClearedBackgroundColor = new Color(0.22f, 0.24f, 0.28f, 0.9f);
-        private static readonly Color HintBackgroundColor = new Color(0.46f, 0.84f, 0.74f, 1f);
-        private static readonly Color HintPulseBackgroundColor = new Color(0.86f, 0.97f, 0.84f, 1f);
-        private static readonly Color TextColor = new Color(0.12f, 0.14f, 0.18f, 1f);
-
         private Image _background;
         private Text _label;
         private Button _button;
@@ -36,7 +30,7 @@ namespace Game.Gameplay.Board
             tileObject.transform.SetParent(parent, false);
 
             var tileImage = tileObject.GetComponent<Image>();
-            tileImage.color = NormalBackgroundColor;
+            tileImage.color = GamePalette.BoardTileNormalBackground;
 
             var tileButton = tileObject.GetComponent<Button>();
             tileButton.transition = Selectable.Transition.None;
@@ -56,7 +50,7 @@ namespace Game.Gameplay.Board
             label.fontStyle = FontStyle.Bold;
             label.fontSize = 32;
             label.alignment = TextAnchor.MiddleCenter;
-            label.color = TextColor;
+            label.color = GamePalette.BoardTileText;
             label.raycastTarget = false;
             label.resizeTextForBestFit = true;
             label.resizeTextMinSize = 18;
@@ -126,29 +120,34 @@ namespace Game.Gameplay.Board
                 return;
             }
 
-            _label.text = _cell.IsMatched ? string.Empty : _cell.Number.ToString();
+            _label.text = _cell.Number.ToString();
+            _label.color = _cell.IsMatched
+                ? GamePalette.InactiveNumberColor
+                : GamePalette.BoardTileText;
             _button.interactable = !_cell.IsMatched;
 
             if (_cell.IsMatched)
             {
-                _background.color = ClearedBackgroundColor;
+                _background.color = Color.clear;
                 return;
             }
 
             if (_cell.IsSelected)
             {
-                _background.color = SelectedBackgroundColor;
+                _background.color = GamePalette.BoardTileSelectedBackground;
                 return;
             }
 
-            _background.color = _isHinted ? HintBackgroundColor : NormalBackgroundColor;
+            _background.color = _isHinted
+                ? GamePalette.BoardTileHintBackground
+                : Color.clear;
         }
 
         private IEnumerator PlayHintPulse()
         {
             for (int pulse = 0; pulse < 2; pulse++)
             {
-                _background.color = HintPulseBackgroundColor;
+                _background.color = GamePalette.BoardTileHintPulseBackground;
                 yield return new WaitForSeconds(0.12f);
                 ApplyVisualState();
                 yield return new WaitForSeconds(0.08f);

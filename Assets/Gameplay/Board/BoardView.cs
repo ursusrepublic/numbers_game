@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Game.UI.Styling;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -9,14 +10,7 @@ namespace Game.Gameplay.Board
     [DisallowMultipleComponent]
     public sealed class BoardView : MonoBehaviour
     {
-        private static readonly Color HudPanelColor = new Color(0.16f, 0.18f, 0.24f, 0.96f);
-        private static readonly Color ScrollPanelColor = new Color(0.12f, 0.14f, 0.18f, 0.92f);
-        private static readonly Color ActiveButtonColor = new Color(0.28f, 0.56f, 0.92f, 1f);
-        private static readonly Color LockedButtonColor = new Color(0.28f, 0.44f, 0.60f, 0.95f);
-        private static readonly Color DisabledButtonColor = new Color(0.30f, 0.32f, 0.38f, 0.9f);
-        private static readonly Color TooltipColor = new Color(1f, 0.93f, 0.70f, 1f);
-        private static readonly Color DeveloperPairLineColor = new Color(1f, 0.42f, 0.18f, 0.55f);
-        private static readonly Color TextColor = Color.white;
+        private const int ExtraEmptyRows = 2;
 
         public event Action<int> TileClicked;
         public event Action PlusClicked;
@@ -27,12 +21,18 @@ namespace Game.Gameplay.Board
         private readonly HashSet<int> _hintedIndices = new();
         private readonly List<RectTransform> _developerLineRects = new();
         private readonly List<BoardMatchInfo> _developerPairs = new();
+        private static Texture2D _notebookGridTexture;
 
         private RectTransform _viewportRect;
         private RectTransform _contentRect;
+        private RectTransform _surfaceRect;
         private RectTransform _effectsRect;
         private GridLayoutGroup _gridLayoutGroup;
         private ScrollRect _scrollRect;
+        private Canvas _rootCanvas;
+        private RawImage _surfaceImage;
+        private Image _surfaceRightBorder;
+        private Image _surfaceBottomBorder;
         private Button _plusButton;
         private Button _hintButton;
         private Image _plusButtonImage;
@@ -52,10 +52,27 @@ namespace Game.Gameplay.Board
         private Coroutine _tooltipRoutine;
         private int _columns;
         private int _cellCount;
+        private int _visualRowCount;
         private float _lastViewportWidth = -1f;
 
         public static BoardView Create(Transform parent, int columns)
         {
+            var backgroundObject = new GameObject(
+                "GameBackground",
+                typeof(RectTransform),
+                typeof(Image));
+
+            backgroundObject.transform.SetParent(parent, false);
+
+            var backgroundRect = (RectTransform)backgroundObject.transform;
+            backgroundRect.anchorMin = Vector2.zero;
+            backgroundRect.anchorMax = Vector2.one;
+            backgroundRect.offsetMin = Vector2.zero;
+            backgroundRect.offsetMax = Vector2.zero;
+
+            var backgroundImage = backgroundObject.GetComponent<Image>();
+            backgroundImage.color = GamePalette.GameBackground;
+
             var hudPanelObject = new GameObject(
                 "HudPanel",
                 typeof(RectTransform),
@@ -67,11 +84,11 @@ namespace Game.Gameplay.Board
             hudPanelRect.anchorMin = new Vector2(0f, 1f);
             hudPanelRect.anchorMax = new Vector2(1f, 1f);
             hudPanelRect.pivot = new Vector2(0.5f, 1f);
-            hudPanelRect.offsetMin = new Vector2(32f, -220f);
-            hudPanelRect.offsetMax = new Vector2(-32f, -32f);
+            hudPanelRect.offsetMin = new Vector2(0f, -220f);
+            hudPanelRect.offsetMax = new Vector2(0f, -32f);
 
             var hudPanelImage = hudPanelObject.GetComponent<Image>();
-            hudPanelImage.color = HudPanelColor;
+            hudPanelImage.color = GamePalette.HudPanelBackground;
 
             Text scoreLabel = CreateTextElement(hudPanelObject.transform, "ScoreLabel");
             ConfigureRect((RectTransform)scoreLabel.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(320f, 52f), new Vector2(20f, -18f));
@@ -102,11 +119,11 @@ namespace Game.Gameplay.Board
             var scrollViewRect = (RectTransform)scrollViewObject.transform;
             scrollViewRect.anchorMin = Vector2.zero;
             scrollViewRect.anchorMax = Vector2.one;
-            scrollViewRect.offsetMin = new Vector2(32f, 32f);
-            scrollViewRect.offsetMax = new Vector2(-32f, -236f);
+            scrollViewRect.offsetMin = new Vector2(0f, 32f);
+            scrollViewRect.offsetMax = new Vector2(0f, -236f);
 
             var scrollViewImage = scrollViewObject.GetComponent<Image>();
-            scrollViewImage.color = ScrollPanelColor;
+            scrollViewImage.color = GamePalette.BoardScrollBackground;
 
             var viewportObject = new GameObject(
                 "Viewport",
@@ -119,8 +136,8 @@ namespace Game.Gameplay.Board
             var viewportRect = (RectTransform)viewportObject.transform;
             viewportRect.anchorMin = Vector2.zero;
             viewportRect.anchorMax = Vector2.one;
-            viewportRect.offsetMin = new Vector2(16f, 16f);
-            viewportRect.offsetMax = new Vector2(-16f, -16f);
+            viewportRect.offsetMin = new Vector2(8f, 16f);
+            viewportRect.offsetMax = new Vector2(-8f, -16f);
 
             var viewportImage = viewportObject.GetComponent<Image>();
             viewportImage.color = new Color(0f, 0f, 0f, 0.01f);
@@ -141,6 +158,62 @@ namespace Game.Gameplay.Board
             contentRect.pivot = new Vector2(0.5f, 1f);
             contentRect.anchoredPosition = Vector2.zero;
 
+            var surfaceObject = new GameObject(
+                "BoardSurface",
+                typeof(RectTransform),
+                typeof(RawImage),
+                typeof(LayoutElement));
+
+            surfaceObject.transform.SetParent(contentObject.transform, false);
+
+            var surfaceRect = (RectTransform)surfaceObject.transform;
+            surfaceRect.anchorMin = new Vector2(0f, 1f);
+            surfaceRect.anchorMax = new Vector2(0f, 1f);
+            surfaceRect.pivot = new Vector2(0f, 1f);
+            surfaceRect.anchoredPosition = Vector2.zero;
+
+            var surfaceImage = surfaceObject.GetComponent<RawImage>();
+            surfaceImage.texture = GetNotebookGridTexture();
+            surfaceImage.color = Color.white;
+            surfaceImage.raycastTarget = false;
+
+            var surfaceLayout = surfaceObject.GetComponent<LayoutElement>();
+            surfaceLayout.ignoreLayout = true;
+
+            var rightBorderObject = new GameObject(
+                "RightBorder",
+                typeof(RectTransform),
+                typeof(Image));
+
+            rightBorderObject.transform.SetParent(surfaceObject.transform, false);
+
+            var rightBorderRect = (RectTransform)rightBorderObject.transform;
+            rightBorderRect.anchorMin = new Vector2(1f, 0f);
+            rightBorderRect.anchorMax = new Vector2(1f, 1f);
+            rightBorderRect.pivot = new Vector2(1f, 0.5f);
+            rightBorderRect.anchoredPosition = Vector2.zero;
+
+            var rightBorderImage = rightBorderObject.GetComponent<Image>();
+            rightBorderImage.color = GamePalette.GridLineColor;
+            rightBorderImage.raycastTarget = false;
+
+            var bottomBorderObject = new GameObject(
+                "BottomBorder",
+                typeof(RectTransform),
+                typeof(Image));
+
+            bottomBorderObject.transform.SetParent(surfaceObject.transform, false);
+
+            var bottomBorderRect = (RectTransform)bottomBorderObject.transform;
+            bottomBorderRect.anchorMin = new Vector2(0f, 0f);
+            bottomBorderRect.anchorMax = new Vector2(1f, 0f);
+            bottomBorderRect.pivot = new Vector2(0.5f, 0f);
+            bottomBorderRect.anchoredPosition = Vector2.zero;
+
+            var bottomBorderImage = bottomBorderObject.GetComponent<Image>();
+            bottomBorderImage.color = GamePalette.GridLineColor;
+            bottomBorderImage.raycastTarget = false;
+
             var effectsObject = new GameObject(
                 "BoardEffects",
                 typeof(RectTransform),
@@ -160,8 +233,8 @@ namespace Game.Gameplay.Board
             var gridLayoutGroup = contentObject.GetComponent<GridLayoutGroup>();
             gridLayoutGroup.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             gridLayoutGroup.constraintCount = Mathf.Max(1, columns);
-            gridLayoutGroup.spacing = new Vector2(8f, 8f);
-            gridLayoutGroup.padding = new RectOffset(8, 8, 8, 8);
+            gridLayoutGroup.spacing = Vector2.zero;
+            gridLayoutGroup.padding = new RectOffset(0, 0, 0, 0);
             gridLayoutGroup.childAlignment = TextAnchor.UpperCenter;
 
             var scrollRect = scrollViewObject.GetComponent<ScrollRect>();
@@ -186,7 +259,7 @@ namespace Game.Gameplay.Board
             overlayRect.offsetMax = Vector2.zero;
 
             var overlayImage = overlayObject.GetComponent<Image>();
-            overlayImage.color = new Color(0.05f, 0.06f, 0.09f, 0.84f);
+            overlayImage.color = GamePalette.GameOverOverlay;
 
             var panelObject = new GameObject(
                 "GameOverPanel",
@@ -203,7 +276,7 @@ namespace Game.Gameplay.Board
             panelRect.anchoredPosition = Vector2.zero;
 
             var panelImage = panelObject.GetComponent<Image>();
-            panelImage.color = HudPanelColor;
+            panelImage.color = GamePalette.HudPanelBackground;
 
             Text titleLabel = CreateTextElement(panelObject.transform, "TitleLabel");
             ConfigureRect((RectTransform)titleLabel.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(520f, 72f), new Vector2(0f, -60f));
@@ -222,6 +295,10 @@ namespace Game.Gameplay.Board
             boardView.Setup(
                 viewportRect,
                 contentRect,
+                surfaceRect,
+                surfaceImage,
+                rightBorderImage,
+                bottomBorderImage,
                 effectsRect,
                 gridLayoutGroup,
                 scrollRect,
@@ -249,7 +326,6 @@ namespace Game.Gameplay.Board
         public void SetCells(IReadOnlyList<BoardCell> cells)
         {
             _cellCount = cells.Count;
-
             EnsureTileCount(_cellCount);
 
             for (int index = 0; index < _cellCount; index++)
@@ -264,6 +340,8 @@ namespace Game.Gameplay.Board
                 _tiles[index].SetHinted(false);
                 _tiles[index].gameObject.SetActive(false);
             }
+
+            _surfaceRect?.SetAsFirstSibling();
 
             if (_effectsRect != null)
             {
@@ -314,8 +392,8 @@ namespace Game.Gameplay.Board
             }
 
             _plusButton.interactable = interactable;
-            _plusButtonImage.color = interactable ? ActiveButtonColor : DisabledButtonColor;
-            _plusButtonLabel.color = interactable ? TextColor : new Color(1f, 1f, 1f, 0.65f);
+            _plusButtonImage.color = interactable ? GamePalette.PrimaryButton : GamePalette.DisabledButton;
+            _plusButtonLabel.color = interactable ? GamePalette.PrimaryText : GamePalette.DisabledText;
         }
 
         public void SetHintButtonLocked(bool isLocked)
@@ -325,8 +403,8 @@ namespace Game.Gameplay.Board
                 return;
             }
 
-            _hintButtonImage.color = isLocked ? LockedButtonColor : ActiveButtonColor;
-            _hintButtonLabel.color = isLocked ? new Color(1f, 1f, 1f, 0.82f) : TextColor;
+            _hintButtonImage.color = isLocked ? GamePalette.LockedButton : GamePalette.PrimaryButton;
+            _hintButtonLabel.color = isLocked ? GamePalette.LockedText : GamePalette.PrimaryText;
         }
 
         public void ShowHint(BoardMatchInfo matchInfo)
@@ -510,6 +588,10 @@ namespace Game.Gameplay.Board
         private void Setup(
             RectTransform viewportRect,
             RectTransform contentRect,
+            RectTransform surfaceRect,
+            RawImage surfaceImage,
+            Image surfaceRightBorder,
+            Image surfaceBottomBorder,
             RectTransform effectsRect,
             GridLayoutGroup gridLayoutGroup,
             ScrollRect scrollRect,
@@ -533,9 +615,14 @@ namespace Game.Gameplay.Board
         {
             _viewportRect = viewportRect;
             _contentRect = contentRect;
+            _surfaceRect = surfaceRect;
+            _surfaceImage = surfaceImage;
+            _surfaceRightBorder = surfaceRightBorder;
+            _surfaceBottomBorder = surfaceBottomBorder;
             _effectsRect = effectsRect;
             _gridLayoutGroup = gridLayoutGroup;
             _scrollRect = scrollRect;
+            _rootCanvas = GetComponentInParent<Canvas>();
             _scoreLabel = scoreLabel;
             _additionsLabel = additionsLabel;
             _tooltipLabel = tooltipLabel;
@@ -554,18 +641,18 @@ namespace Game.Gameplay.Board
             _columns = Mathf.Max(1, columns);
             _labelFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
-            ConfigureLabel(_scoreLabel, 42, TextAnchor.MiddleLeft, TextColor);
-            ConfigureLabel(_additionsLabel, 30, TextAnchor.MiddleLeft, new Color(0.86f, 0.90f, 0.96f, 1f));
-            ConfigureLabel(_tooltipLabel, 28, TextAnchor.MiddleCenter, TooltipColor);
+            ConfigureLabel(_scoreLabel, 42, TextAnchor.MiddleLeft, GamePalette.PrimaryText);
+            ConfigureLabel(_additionsLabel, 30, TextAnchor.MiddleLeft, GamePalette.SecondaryText);
+            ConfigureLabel(_tooltipLabel, 28, TextAnchor.MiddleCenter, GamePalette.TooltipText);
             _tooltipLabel.enabled = false;
             _tooltipLabel.text = string.Empty;
 
-            ConfigureLabel(_plusButtonLabel, 34, TextAnchor.MiddleCenter, TextColor);
-            ConfigureLabel(_hintButtonLabel, 28, TextAnchor.MiddleCenter, TextColor);
-            ConfigureLabel(gameOverTitleLabel, 48, TextAnchor.MiddleCenter, TextColor);
-            ConfigureLabel(_gameOverScoreLabel, 34, TextAnchor.MiddleCenter, TextColor);
-            ConfigureLabel(_gameOverStageLabel, 34, TextAnchor.MiddleCenter, new Color(0.86f, 0.90f, 0.96f, 1f));
-            ConfigureLabel(_restartButtonLabel, 34, TextAnchor.MiddleCenter, TextColor);
+            ConfigureLabel(_plusButtonLabel, 34, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
+            ConfigureLabel(_hintButtonLabel, 28, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
+            ConfigureLabel(gameOverTitleLabel, 48, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
+            ConfigureLabel(_gameOverScoreLabel, 34, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
+            ConfigureLabel(_gameOverStageLabel, 34, TextAnchor.MiddleCenter, GamePalette.SecondaryText);
+            ConfigureLabel(_restartButtonLabel, 34, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
 
             _plusButton.onClick.AddListener(HandlePlusClicked);
             _hintButton.onClick.AddListener(HandleHintClicked);
@@ -585,6 +672,9 @@ namespace Game.Gameplay.Board
                 var tile = BoardTileView.Create(_contentRect, _labelFont, HandleTileClicked);
                 _tiles.Add(tile);
             }
+
+            _surfaceRect?.SetAsFirstSibling();
+            _effectsRect?.SetAsLastSibling();
         }
 
         private void HandleTileClicked(int index)
@@ -643,15 +733,8 @@ namespace Game.Gameplay.Board
 
         private void UpdateLayout()
         {
-            if (_viewportRect == null || _contentRect == null)
+            if (_viewportRect == null || _contentRect == null || _gridLayoutGroup == null)
             {
-                return;
-            }
-
-            if (_cellCount == 0)
-            {
-                _contentRect.sizeDelta = new Vector2(0f, Mathf.Max(0f, _viewportRect.rect.height));
-                ClearDeveloperPairLines();
                 return;
             }
 
@@ -661,27 +744,144 @@ namespace Game.Gameplay.Board
                 return;
             }
 
-            float totalSpacing = _gridLayoutGroup.spacing.x * (_columns - 1);
-            float usableWidth = viewportWidth
-                - _gridLayoutGroup.padding.left
-                - _gridLayoutGroup.padding.right
-                - totalSpacing;
-            float cellSize = Mathf.Max(48f, Mathf.Floor(usableWidth / _columns));
+            float pixelSize = GetCanvasPixelSize();
+            float totalSpacing = _gridLayoutGroup.spacing.x * Mathf.Max(0, _columns - 1);
+            float usableWidth = Mathf.Max(0f, viewportWidth - totalSpacing);
+            float cellSize = Mathf.Max(48f, SnapDownToCanvasPixel(usableWidth / _columns, pixelSize));
 
             _gridLayoutGroup.cellSize = new Vector2(cellSize, cellSize);
 
-            int rows = Mathf.CeilToInt((float)_cellCount / _columns);
-            float contentHeight = _gridLayoutGroup.padding.top
-                + _gridLayoutGroup.padding.bottom
-                + (rows * cellSize)
-                + (Mathf.Max(0, rows - 1) * _gridLayoutGroup.spacing.y);
+            int activeRows = _cellCount > 0 ? Mathf.CeilToInt((float)_cellCount / _columns) : 0;
+            float rowStride = cellSize + _gridLayoutGroup.spacing.y;
+            float viewportHeight = _viewportRect.rect.height;
+            int minVisibleRows = Mathf.Max(1, Mathf.CeilToInt(viewportHeight / Mathf.Max(pixelSize, rowStride)));
+            _visualRowCount = Mathf.Max(Mathf.Max(1, activeRows), minVisibleRows) + ExtraEmptyRows;
 
-            _contentRect.sizeDelta = new Vector2(0f, Mathf.Max(_viewportRect.rect.height, contentHeight));
+            float contentHeight = (_visualRowCount * cellSize) + (Mathf.Max(0, _visualRowCount - 1) * _gridLayoutGroup.spacing.y);
+            _contentRect.sizeDelta = new Vector2(0f, Mathf.Max(viewportHeight, contentHeight));
+
+            RefreshBoardSurface(cellSize, _visualRowCount);
 
             if (_developerPairs.Count > 0)
             {
                 RefreshDeveloperPairLines();
             }
+            else
+            {
+                ClearDeveloperPairLines();
+            }
+        }
+
+        private void RefreshBoardSurface(float cellSize, int visualRowCount)
+        {
+            if (_contentRect == null || _surfaceRect == null || _surfaceImage == null || _columns <= 0 || visualRowCount <= 0)
+            {
+                return;
+            }
+
+            float gridWidth = (_columns * cellSize) + (Mathf.Max(0, _columns - 1) * _gridLayoutGroup.spacing.x);
+            float gridHeight = (visualRowCount * cellSize) + (Mathf.Max(0, visualRowCount - 1) * _gridLayoutGroup.spacing.y);
+            float startX = (_contentRect.rect.width - gridWidth) * 0.5f;
+
+            ConfigureOverlayRect(_surfaceRect, startX, 0f, gridWidth, gridHeight);
+            _surfaceImage.texture = GetNotebookGridTexture();
+            _surfaceImage.uvRect = new Rect(0f, 0f, _columns, visualRowCount);
+
+            _surfaceRect.SetAsFirstSibling();
+            _effectsRect?.SetAsLastSibling();
+
+            float thickness = GetCanvasPixelSize();
+            if (_surfaceRightBorder != null)
+            {
+                RectTransform rightBorderRect = (RectTransform)_surfaceRightBorder.transform;
+                rightBorderRect.sizeDelta = new Vector2(thickness, 0f);
+            }
+
+            if (_surfaceBottomBorder != null)
+            {
+                RectTransform bottomBorderRect = (RectTransform)_surfaceBottomBorder.transform;
+                bottomBorderRect.sizeDelta = new Vector2(0f, thickness);
+            }
+        }
+
+        private void ConfigureOverlayRect(RectTransform rect, float left, float top, float width, float height)
+        {
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = new Vector2(left, -top);
+            rect.sizeDelta = new Vector2(width, height);
+        }
+
+        private float GetCanvasPixelSize()
+        {
+            float scaleFactor = _rootCanvas != null ? _rootCanvas.scaleFactor : 1f;
+            return 1f / Mathf.Max(1f, scaleFactor);
+        }
+
+        private static float SnapDownToCanvasPixel(float value, float pixelSize)
+        {
+            if (pixelSize <= 0f)
+            {
+                return value;
+            }
+
+            return Mathf.Floor(value / pixelSize) * pixelSize;
+        }
+
+        private static Texture2D GetNotebookGridTexture()
+        {
+            if (_notebookGridTexture != null)
+            {
+                return _notebookGridTexture;
+            }
+
+            const int textureSize = 64;
+            const int mainLineThickness = 2;
+            const int softLineThickness = 1;
+
+            _notebookGridTexture = new Texture2D(textureSize, textureSize, TextureFormat.RGBA32, false);
+            _notebookGridTexture.name = "NotebookGridTexture";
+            _notebookGridTexture.wrapMode = TextureWrapMode.Repeat;
+            _notebookGridTexture.filterMode = FilterMode.Bilinear;
+            _notebookGridTexture.hideFlags = HideFlags.HideAndDontSave;
+
+            Color background = GamePalette.BoardTileNormalBackground;
+            Color mainLine = GamePalette.GridLineColor;
+            Color softLine = Color.Lerp(background, mainLine, 0.35f);
+            Color[] pixels = new Color[textureSize * textureSize];
+
+            for (int index = 0; index < pixels.Length; index++)
+            {
+                pixels[index] = background;
+            }
+
+            for (int y = 0; y < textureSize; y++)
+            {
+                for (int x = 0; x < textureSize; x++)
+                {
+                    bool isMainVertical = x < mainLineThickness;
+                    bool isSoftVertical = !isMainVertical && x < mainLineThickness + softLineThickness;
+                    bool isMainHorizontal = y >= textureSize - mainLineThickness;
+                    bool isSoftHorizontal = !isMainHorizontal && y >= textureSize - (mainLineThickness + softLineThickness);
+
+                    Color color = background;
+                    if (isMainVertical || isMainHorizontal)
+                    {
+                        color = mainLine;
+                    }
+                    else if (isSoftVertical || isSoftHorizontal)
+                    {
+                        color = softLine;
+                    }
+
+                    pixels[(y * textureSize) + x] = color;
+                }
+            }
+
+            _notebookGridTexture.SetPixels(pixels);
+            _notebookGridTexture.Apply(false, true);
+            return _notebookGridTexture;
         }
 
         private IEnumerator HideTooltipAfterDelay(float duration)
@@ -743,7 +943,7 @@ namespace Game.Gameplay.Board
                 layoutElement.ignoreLayout = true;
 
                 var lineImage = lineObject.GetComponent<Image>();
-                lineImage.color = DeveloperPairLineColor;
+                lineImage.color = GamePalette.DeveloperPairLine;
                 lineImage.raycastTarget = false;
 
                 var lineRect = (RectTransform)lineObject.transform;
@@ -809,7 +1009,7 @@ namespace Game.Gameplay.Board
             buttonObject.transform.SetParent(parent, false);
 
             var buttonImage = buttonObject.GetComponent<Image>();
-            buttonImage.color = ActiveButtonColor;
+            buttonImage.color = GamePalette.PrimaryButton;
 
             var button = buttonObject.GetComponent<Button>();
             button.transition = Selectable.Transition.None;

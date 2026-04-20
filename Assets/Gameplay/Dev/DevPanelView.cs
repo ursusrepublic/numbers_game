@@ -1,4 +1,5 @@
 using System;
+using Game.UI.Styling;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -7,11 +8,6 @@ namespace Game.Gameplay.Dev
     [DisallowMultipleComponent]
     public sealed class DevPanelView : MonoBehaviour
     {
-        private static readonly Color PanelColor = new Color(0.14f, 0.17f, 0.22f, 0.96f);
-        private static readonly Color ButtonColor = new Color(0.82f, 0.40f, 0.26f, 1f);
-        private static readonly Color TextColor = Color.white;
-        private static readonly Color InfoColor = new Color(0.88f, 0.91f, 0.96f, 1f);
-
         public event Action ShowPairsClicked;
         public event Action SolveOnePairClicked;
 
@@ -37,7 +33,7 @@ namespace Game.Gameplay.Dev
             panelRect.anchoredPosition = new Vector2(-32f, -260f);
 
             var panelImage = panelObject.GetComponent<Image>();
-            panelImage.color = PanelColor;
+            panelImage.color = GamePalette.DeveloperPanelBackground;
 
             Text titleLabel = CreateTextElement(panelObject.transform, "TitleLabel");
             ConfigureRect((RectTransform)titleLabel.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(280f, 48f), new Vector2(0f, -26f));
@@ -92,10 +88,10 @@ namespace Game.Gameplay.Dev
             _showPairsButton = showPairsButton;
             _solveOnePairButton = solveOnePairButton;
 
-            ConfigureLabel(titleLabel, 34, TextAnchor.MiddleCenter, TextColor);
-            ConfigureLabel(_infoLabel, 24, TextAnchor.UpperLeft, InfoColor);
-            ConfigureLabel(showPairsLabel, 26, TextAnchor.MiddleCenter, TextColor);
-            ConfigureLabel(solveOnePairLabel, 26, TextAnchor.MiddleCenter, TextColor);
+            ConfigureLabel(titleLabel, 34, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
+            ConfigureLabel(_infoLabel, 24, TextAnchor.UpperLeft, GamePalette.DeveloperPanelInfo);
+            ConfigureLabel(showPairsLabel, 26, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
+            ConfigureLabel(solveOnePairLabel, 26, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
 
             _showPairsButton.onClick.AddListener(HandleShowPairsClicked);
             _solveOnePairButton.onClick.AddListener(HandleSolveOnePairClicked);
@@ -129,7 +125,7 @@ namespace Game.Gameplay.Dev
             buttonObject.transform.SetParent(parent, false);
 
             var buttonImage = buttonObject.GetComponent<Image>();
-            buttonImage.color = ButtonColor;
+            buttonImage.color = GamePalette.DeveloperPanelButton;
 
             var button = buttonObject.GetComponent<Button>();
             button.transition = Selectable.Transition.None;
