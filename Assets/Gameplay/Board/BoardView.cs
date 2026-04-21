@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using Game.UI.Styling;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -37,25 +38,26 @@ namespace Game.Gameplay.Board
         private Button _hintButton;
         private Image _plusButtonImage;
         private Image _hintButtonImage;
-        private Text _scoreLabel;
-        private Text _additionsLabel;
-        private Text _tooltipLabel;
-        private Text _plusButtonLabel;
-        private Text _hintButtonLabel;
+        private TMP_Text _scoreLabel;
+        private TMP_Text _additionsLabel;
+        private TMP_Text _tooltipLabel;
+        private TMP_Text _plusButtonLabel;
+        private TMP_Text _hintButtonLabel;
         private GameObject _gameOverOverlay;
-        private Text _gameOverScoreLabel;
-        private Text _gameOverStageLabel;
+        private TMP_Text _gameOverScoreLabel;
+        private TMP_Text _gameOverStageLabel;
         private Button _restartButton;
         private Image _restartButtonImage;
-        private Text _restartButtonLabel;
-        private Font _labelFont;
+        private TMP_Text _restartButtonLabel;
+        private TMP_FontAsset _regularFont;
+        private TMP_FontAsset _boldFont;
         private Coroutine _tooltipRoutine;
         private int _columns;
         private int _cellCount;
         private int _visualRowCount;
         private float _lastViewportWidth = -1f;
 
-        public static BoardView Create(Transform parent, int columns)
+        public static BoardView Create(Transform parent, int columns, TMP_FontAsset regularFont, TMP_FontAsset boldFont)
         {
             var backgroundObject = new GameObject(
                 "GameBackground",
@@ -90,19 +92,19 @@ namespace Game.Gameplay.Board
             var hudPanelImage = hudPanelObject.GetComponent<Image>();
             hudPanelImage.color = GamePalette.HudPanelBackground;
 
-            Text scoreLabel = CreateTextElement(hudPanelObject.transform, "ScoreLabel");
+            TMP_Text scoreLabel = CreateTextElement(hudPanelObject.transform, "ScoreLabel");
             ConfigureRect((RectTransform)scoreLabel.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(320f, 52f), new Vector2(20f, -18f));
 
-            Text additionsLabel = CreateTextElement(hudPanelObject.transform, "AdditionsLabel");
+            TMP_Text additionsLabel = CreateTextElement(hudPanelObject.transform, "AdditionsLabel");
             ConfigureRect((RectTransform)additionsLabel.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(220f, 40f), new Vector2(20f, -78f));
 
-            (Button hintButton, Image hintButtonImage, Text hintButtonLabel) = CreateButton(hudPanelObject.transform, "HintButton", "Hint");
+            (Button hintButton, Image hintButtonImage, TMP_Text hintButtonLabel) = CreateButton(hudPanelObject.transform, "HintButton", "Hint");
             ConfigureRect((RectTransform)hintButton.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(136f, 52f), new Vector2(-152f, -18f));
 
-            (Button plusButton, Image plusButtonImage, Text plusButtonLabel) = CreateButton(hudPanelObject.transform, "PlusButton", "+");
+            (Button plusButton, Image plusButtonImage, TMP_Text plusButtonLabel) = CreateButton(hudPanelObject.transform, "PlusButton", "+");
             ConfigureRect((RectTransform)plusButton.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(120f, 52f), new Vector2(-20f, -18f));
 
-            Text tooltipLabel = CreateTextElement(hudPanelObject.transform, "TooltipLabel");
+            TMP_Text tooltipLabel = CreateTextElement(hudPanelObject.transform, "TooltipLabel");
             ConfigureRect((RectTransform)tooltipLabel.transform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), Vector2.zero, new Vector2(0f, 0f));
             ((RectTransform)tooltipLabel.transform).offsetMin = new Vector2(20f, 18f);
             ((RectTransform)tooltipLabel.transform).offsetMax = new Vector2(-20f, 66f);
@@ -278,17 +280,17 @@ namespace Game.Gameplay.Board
             var panelImage = panelObject.GetComponent<Image>();
             panelImage.color = GamePalette.HudPanelBackground;
 
-            Text titleLabel = CreateTextElement(panelObject.transform, "TitleLabel");
+            TMP_Text titleLabel = CreateTextElement(panelObject.transform, "TitleLabel");
             ConfigureRect((RectTransform)titleLabel.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(520f, 72f), new Vector2(0f, -60f));
             titleLabel.text = "Game Over";
 
-            Text gameOverScoreLabel = CreateTextElement(panelObject.transform, "ScoreLabel");
+            TMP_Text gameOverScoreLabel = CreateTextElement(panelObject.transform, "ScoreLabel");
             ConfigureRect((RectTransform)gameOverScoreLabel.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(520f, 56f), new Vector2(0f, -160f));
 
-            Text gameOverStageLabel = CreateTextElement(panelObject.transform, "StageLabel");
+            TMP_Text gameOverStageLabel = CreateTextElement(panelObject.transform, "StageLabel");
             ConfigureRect((RectTransform)gameOverStageLabel.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(520f, 56f), new Vector2(0f, -230f));
 
-            (Button restartButton, Image restartButtonImage, Text restartButtonLabel) = CreateButton(panelObject.transform, "RestartButton", "Restart");
+            (Button restartButton, Image restartButtonImage, TMP_Text restartButtonLabel) = CreateButton(panelObject.transform, "RestartButton", "Restart");
             ConfigureRect((RectTransform)restartButton.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(260f, 64f), new Vector2(0f, 54f));
 
             var boardView = scrollViewObject.GetComponent<BoardView>();
@@ -318,6 +320,8 @@ namespace Game.Gameplay.Board
                 restartButtonImage,
                 restartButtonLabel,
                 titleLabel,
+                regularFont,
+                boldFont,
                 columns);
 
             return boardView;
@@ -595,22 +599,24 @@ namespace Game.Gameplay.Board
             RectTransform effectsRect,
             GridLayoutGroup gridLayoutGroup,
             ScrollRect scrollRect,
-            Text scoreLabel,
-            Text additionsLabel,
-            Text tooltipLabel,
+            TMP_Text scoreLabel,
+            TMP_Text additionsLabel,
+            TMP_Text tooltipLabel,
             Button plusButton,
             Image plusButtonImage,
-            Text plusButtonLabel,
+            TMP_Text plusButtonLabel,
             Button hintButton,
             Image hintButtonImage,
-            Text hintButtonLabel,
+            TMP_Text hintButtonLabel,
             GameObject gameOverOverlay,
-            Text gameOverScoreLabel,
-            Text gameOverStageLabel,
+            TMP_Text gameOverScoreLabel,
+            TMP_Text gameOverStageLabel,
             Button restartButton,
             Image restartButtonImage,
-            Text restartButtonLabel,
-            Text gameOverTitleLabel,
+            TMP_Text restartButtonLabel,
+            TMP_Text gameOverTitleLabel,
+            TMP_FontAsset regularFont,
+            TMP_FontAsset boldFont,
             int columns)
         {
             _viewportRect = viewportRect;
@@ -639,20 +645,21 @@ namespace Game.Gameplay.Board
             _restartButtonImage = restartButtonImage;
             _restartButtonLabel = restartButtonLabel;
             _columns = Mathf.Max(1, columns);
-            _labelFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            _regularFont = regularFont != null ? regularFont : boldFont;
+            _boldFont = boldFont != null ? boldFont : _regularFont;
 
-            ConfigureLabel(_scoreLabel, 42, TextAnchor.MiddleLeft, GamePalette.PrimaryText);
-            ConfigureLabel(_additionsLabel, 30, TextAnchor.MiddleLeft, GamePalette.SecondaryText);
-            ConfigureLabel(_tooltipLabel, 28, TextAnchor.MiddleCenter, GamePalette.TooltipText);
+            ConfigureLabel(_scoreLabel, _regularFont, 42, TextAnchor.MiddleLeft, GamePalette.PrimaryText);
+            ConfigureLabel(_additionsLabel, _regularFont, 30, TextAnchor.MiddleLeft, GamePalette.SecondaryText);
+            ConfigureLabel(_tooltipLabel, _regularFont, 28, TextAnchor.MiddleCenter, GamePalette.TooltipText);
             _tooltipLabel.enabled = false;
             _tooltipLabel.text = string.Empty;
 
-            ConfigureLabel(_plusButtonLabel, 34, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
-            ConfigureLabel(_hintButtonLabel, 28, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
-            ConfigureLabel(gameOverTitleLabel, 48, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
-            ConfigureLabel(_gameOverScoreLabel, 34, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
-            ConfigureLabel(_gameOverStageLabel, 34, TextAnchor.MiddleCenter, GamePalette.SecondaryText);
-            ConfigureLabel(_restartButtonLabel, 34, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
+            ConfigureLabel(_plusButtonLabel, _regularFont, 34, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
+            ConfigureLabel(_hintButtonLabel, _regularFont, 28, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
+            ConfigureLabel(gameOverTitleLabel, _regularFont, 48, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
+            ConfigureLabel(_gameOverScoreLabel, _regularFont, 34, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
+            ConfigureLabel(_gameOverStageLabel, _regularFont, 34, TextAnchor.MiddleCenter, GamePalette.SecondaryText);
+            ConfigureLabel(_restartButtonLabel, _regularFont, 34, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
 
             _plusButton.onClick.AddListener(HandlePlusClicked);
             _hintButton.onClick.AddListener(HandleHintClicked);
@@ -669,7 +676,7 @@ namespace Game.Gameplay.Board
         {
             while (_tiles.Count < requiredCount)
             {
-                var tile = BoardTileView.Create(_contentRect, _labelFont, HandleTileClicked);
+                var tile = BoardTileView.Create(_contentRect, _boldFont, HandleTileClicked);
                 _tiles.Add(tile);
             }
 
@@ -991,14 +998,14 @@ namespace Game.Gameplay.Board
             return true;
         }
 
-        private static Text CreateTextElement(Transform parent, string name)
+        private static TextMeshProUGUI CreateTextElement(Transform parent, string name)
         {
-            var textObject = new GameObject(name, typeof(RectTransform), typeof(Text));
+            var textObject = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
             textObject.transform.SetParent(parent, false);
-            return textObject.GetComponent<Text>();
+            return textObject.GetComponent<TextMeshProUGUI>();
         }
 
-        private static (Button Button, Image Image, Text Label) CreateButton(Transform parent, string name, string labelText)
+        private static (Button Button, Image Image, TMP_Text Label) CreateButton(Transform parent, string name, string labelText)
         {
             var buttonObject = new GameObject(
                 name,
@@ -1015,7 +1022,7 @@ namespace Game.Gameplay.Board
             button.transition = Selectable.Transition.None;
             button.targetGraphic = buttonImage;
 
-            Text label = CreateTextElement(buttonObject.transform, "Label");
+            TMP_Text label = CreateTextElement(buttonObject.transform, "Label");
             RectTransform labelRect = (RectTransform)label.transform;
             labelRect.anchorMin = Vector2.zero;
             labelRect.anchorMax = Vector2.one;
@@ -1042,14 +1049,32 @@ namespace Game.Gameplay.Board
             rectTransform.anchoredPosition = anchoredPosition;
         }
 
-        private static void ConfigureLabel(Text label, int fontSize, TextAnchor alignment, Color color)
+        private static void ConfigureLabel(TMP_Text label, TMP_FontAsset font, int fontSize, TextAnchor alignment, Color color)
         {
-            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            label.font = font;
             label.fontSize = fontSize;
-            label.alignment = alignment;
+            label.alignment = ConvertAlignment(alignment);
             label.color = color;
-            label.horizontalOverflow = HorizontalWrapMode.Wrap;
-            label.verticalOverflow = VerticalWrapMode.Overflow;
+            label.enableAutoSizing = false;
+            label.enableWordWrapping = true;
+            label.overflowMode = TextOverflowModes.Overflow;
+        }
+
+        private static TextAlignmentOptions ConvertAlignment(TextAnchor alignment)
+        {
+            return alignment switch
+            {
+                TextAnchor.UpperLeft => TextAlignmentOptions.TopLeft,
+                TextAnchor.UpperCenter => TextAlignmentOptions.Top,
+                TextAnchor.UpperRight => TextAlignmentOptions.TopRight,
+                TextAnchor.MiddleLeft => TextAlignmentOptions.Left,
+                TextAnchor.MiddleCenter => TextAlignmentOptions.Center,
+                TextAnchor.MiddleRight => TextAlignmentOptions.Right,
+                TextAnchor.LowerLeft => TextAlignmentOptions.BottomLeft,
+                TextAnchor.LowerCenter => TextAlignmentOptions.Bottom,
+                TextAnchor.LowerRight => TextAlignmentOptions.BottomRight,
+                _ => TextAlignmentOptions.Center,
+            };
         }
     }
 }

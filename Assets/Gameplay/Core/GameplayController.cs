@@ -5,6 +5,7 @@ using Game.Gameplay.Board;
 using Game.Gameplay.Dev;
 using Game.Gameplay.Score;
 using Game.Gameplay.Stage;
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
@@ -35,6 +36,8 @@ namespace Game.Gameplay.Core
         private int _startingAdditions;
         private int _remainingAdditions;
         private GameSessionState _sessionState;
+        private TMP_FontAsset _regularFont;
+        private TMP_FontAsset _boldFont;
 
         public void Initialize(
             AppMode appMode,
@@ -42,7 +45,9 @@ namespace Game.Gameplay.Core
             int initialRows,
             int startingPairs,
             int randomSeed,
-            int startingAdditions)
+            int startingAdditions,
+            TMP_FontAsset regularFont,
+            TMP_FontAsset boldFont)
         {
             _appMode = appMode;
             _columns = Mathf.Max(1, columns);
@@ -60,11 +65,13 @@ namespace Game.Gameplay.Core
             _stageState = new StageState();
             _startingAdditions = Mathf.Max(0, startingAdditions);
             _remainingAdditions = _startingAdditions;
+            _regularFont = regularFont != null ? regularFont : boldFont != null ? boldFont : TMP_Settings.defaultFontAsset;
+            _boldFont = boldFont != null ? boldFont : _regularFont;
 
             EnsureEventSystem();
 
             Transform canvasTransform = CreateCanvas();
-            _boardView = BoardView.Create(canvasTransform, _columns);
+            _boardView = BoardView.Create(canvasTransform, _columns, _regularFont, _boldFont);
             _boardView.TileClicked += OnTileClicked;
             _boardView.PlusClicked += OnPlusClicked;
             _boardView.HintClicked += OnHintClicked;
@@ -78,7 +85,7 @@ namespace Game.Gameplay.Core
 
             if (_appMode == AppMode.Developer)
             {
-                _devPanelView = DevPanelView.Create(canvasTransform);
+                _devPanelView = DevPanelView.Create(canvasTransform, _regularFont);
                 _devPanelView.ShowPairsClicked += OnShowDeveloperPairsClicked;
                 _devPanelView.SolveOnePairClicked += OnSolveOnePairClicked;
             }

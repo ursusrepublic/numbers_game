@@ -1,5 +1,6 @@
 using Game.Core;
 using Game.Gameplay.Core;
+using TMPro;
 using UnityEngine;
 
 namespace Game.Core.Bootstrap
@@ -19,6 +20,10 @@ namespace Game.Core.Bootstrap
         [Header("Additions Settings")]
         [SerializeField] [Min(0)] private int _startingAdditions = 5;
 
+        [Header("Fonts")]
+        [SerializeField] private TMP_FontAsset _regularFont;
+        [SerializeField] private TMP_FontAsset _boldFont;
+
         private void Awake()
         {
             if (transform.Find("GameplayRoot") != null)
@@ -36,7 +41,9 @@ namespace Game.Core.Bootstrap
                 _initialRows,
                 _startingPairs,
                 _randomSeed,
-                _startingAdditions);
+                _startingAdditions,
+                _regularFont,
+                _boldFont);
         }
     }
 }

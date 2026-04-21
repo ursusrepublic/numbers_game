@@ -375,6 +375,8 @@ MonoBehaviour:
   _startingPairs: 8
   _randomSeed: 0
   _startingAdditions: 5
+  _regularFont: {fileID: 11400000, guid: 897e91f298be74061b76773842449d3d, type: 2}
+  _boldFont: {fileID: 11400000, guid: 572baca8bc799483b8f01d62ae1a1575, type: 2}
 --- !u!4 &900000002
 Transform:
   m_ObjectHideFlags: 0

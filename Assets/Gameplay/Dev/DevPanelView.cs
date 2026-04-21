@@ -1,5 +1,6 @@
 using System;
 using Game.UI.Styling;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -11,11 +12,11 @@ namespace Game.Gameplay.Dev
         public event Action ShowPairsClicked;
         public event Action SolveOnePairClicked;
 
-        private Text _infoLabel;
+        private TMP_Text _infoLabel;
         private Button _showPairsButton;
         private Button _solveOnePairButton;
 
-        public static DevPanelView Create(Transform parent)
+        public static DevPanelView Create(Transform parent, TMP_FontAsset font)
         {
             var panelObject = new GameObject(
                 "DevPanel",
@@ -35,23 +36,23 @@ namespace Game.Gameplay.Dev
             var panelImage = panelObject.GetComponent<Image>();
             panelImage.color = GamePalette.DeveloperPanelBackground;
 
-            Text titleLabel = CreateTextElement(panelObject.transform, "TitleLabel");
+            TMP_Text titleLabel = CreateTextElement(panelObject.transform, "TitleLabel");
             ConfigureRect((RectTransform)titleLabel.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(280f, 48f), new Vector2(0f, -26f));
             titleLabel.text = "Developer Mode";
 
-            Text infoLabel = CreateTextElement(panelObject.transform, "InfoLabel");
+            TMP_Text infoLabel = CreateTextElement(panelObject.transform, "InfoLabel");
             ConfigureRect((RectTransform)infoLabel.transform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
             ((RectTransform)infoLabel.transform).offsetMin = new Vector2(20f, 120f);
             ((RectTransform)infoLabel.transform).offsetMax = new Vector2(-20f, -88f);
 
-            (Button showPairsButton, Text showPairsLabel) = CreateButton(panelObject.transform, "ShowPairsButton", "Show All Pairs");
+            (Button showPairsButton, TMP_Text showPairsLabel) = CreateButton(panelObject.transform, "ShowPairsButton", "Show All Pairs");
             ConfigureRect((RectTransform)showPairsButton.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(280f, 56f), new Vector2(0f, 94f));
 
-            (Button solveOnePairButton, Text solveOnePairLabel) = CreateButton(panelObject.transform, "SolveOnePairButton", "Solve One Pair");
+            (Button solveOnePairButton, TMP_Text solveOnePairLabel) = CreateButton(panelObject.transform, "SolveOnePairButton", "Solve One Pair");
             ConfigureRect((RectTransform)solveOnePairButton.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(280f, 56f), new Vector2(0f, 26f));
 
             var devPanelView = panelObject.GetComponent<DevPanelView>();
-            devPanelView.Setup(titleLabel, infoLabel, showPairsButton, showPairsLabel, solveOnePairButton, solveOnePairLabel);
+            devPanelView.Setup(font, titleLabel, infoLabel, showPairsButton, showPairsLabel, solveOnePairButton, solveOnePairLabel);
             return devPanelView;
         }
 
@@ -77,21 +78,22 @@ namespace Game.Gameplay.Dev
         }
 
         private void Setup(
-            Text titleLabel,
-            Text infoLabel,
+            TMP_FontAsset font,
+            TMP_Text titleLabel,
+            TMP_Text infoLabel,
             Button showPairsButton,
-            Text showPairsLabel,
+            TMP_Text showPairsLabel,
             Button solveOnePairButton,
-            Text solveOnePairLabel)
+            TMP_Text solveOnePairLabel)
         {
             _infoLabel = infoLabel;
             _showPairsButton = showPairsButton;
             _solveOnePairButton = solveOnePairButton;
 
-            ConfigureLabel(titleLabel, 34, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
-            ConfigureLabel(_infoLabel, 24, TextAnchor.UpperLeft, GamePalette.DeveloperPanelInfo);
-            ConfigureLabel(showPairsLabel, 26, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
-            ConfigureLabel(solveOnePairLabel, 26, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
+            ConfigureLabel(titleLabel, font, 34, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
+            ConfigureLabel(_infoLabel, font, 24, TextAnchor.UpperLeft, GamePalette.DeveloperPanelInfo);
+            ConfigureLabel(showPairsLabel, font, 26, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
+            ConfigureLabel(solveOnePairLabel, font, 26, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
 
             _showPairsButton.onClick.AddListener(HandleShowPairsClicked);
             _solveOnePairButton.onClick.AddListener(HandleSolveOnePairClicked);
@@ -107,14 +109,14 @@ namespace Game.Gameplay.Dev
             SolveOnePairClicked?.Invoke();
         }
 
-        private static Text CreateTextElement(Transform parent, string name)
+        private static TextMeshProUGUI CreateTextElement(Transform parent, string name)
         {
-            var textObject = new GameObject(name, typeof(RectTransform), typeof(Text));
+            var textObject = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
             textObject.transform.SetParent(parent, false);
-            return textObject.GetComponent<Text>();
+            return textObject.GetComponent<TextMeshProUGUI>();
         }
 
-        private static (Button Button, Text Label) CreateButton(Transform parent, string name, string labelText)
+        private static (Button Button, TMP_Text Label) CreateButton(Transform parent, string name, string labelText)
         {
             var buttonObject = new GameObject(
                 name,
@@ -131,7 +133,7 @@ namespace Game.Gameplay.Dev
             button.transition = Selectable.Transition.None;
             button.targetGraphic = buttonImage;
 
-            Text label = CreateTextElement(buttonObject.transform, "Label");
+            TMP_Text label = CreateTextElement(buttonObject.transform, "Label");
             RectTransform labelRect = (RectTransform)label.transform;
             labelRect.anchorMin = Vector2.zero;
             labelRect.anchorMax = Vector2.one;
@@ -158,14 +160,32 @@ namespace Game.Gameplay.Dev
             rectTransform.anchoredPosition = anchoredPosition;
         }
 
-        private static void ConfigureLabel(Text label, int fontSize, TextAnchor alignment, Color color)
+        private static void ConfigureLabel(TMP_Text label, TMP_FontAsset font, int fontSize, TextAnchor alignment, Color color)
         {
-            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            label.font = font;
             label.fontSize = fontSize;
-            label.alignment = alignment;
+            label.alignment = ConvertAlignment(alignment);
             label.color = color;
-            label.horizontalOverflow = HorizontalWrapMode.Wrap;
-            label.verticalOverflow = VerticalWrapMode.Overflow;
+            label.enableAutoSizing = false;
+            label.enableWordWrapping = true;
+            label.overflowMode = TextOverflowModes.Overflow;
+        }
+
+        private static TextAlignmentOptions ConvertAlignment(TextAnchor alignment)
+        {
+            return alignment switch
+            {
+                TextAnchor.UpperLeft => TextAlignmentOptions.TopLeft,
+                TextAnchor.UpperCenter => TextAlignmentOptions.Top,
+                TextAnchor.UpperRight => TextAlignmentOptions.TopRight,
+                TextAnchor.MiddleLeft => TextAlignmentOptions.Left,
+                TextAnchor.MiddleCenter => TextAlignmentOptions.Center,
+                TextAnchor.MiddleRight => TextAlignmentOptions.Right,
+                TextAnchor.LowerLeft => TextAlignmentOptions.BottomLeft,
+                TextAnchor.LowerCenter => TextAlignmentOptions.Bottom,
+                TextAnchor.LowerRight => TextAlignmentOptions.BottomRight,
+                _ => TextAlignmentOptions.Center,
+            };
         }
     }
 }

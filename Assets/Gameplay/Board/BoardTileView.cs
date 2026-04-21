@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using Game.UI.Styling;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -10,7 +11,7 @@ namespace Game.Gameplay.Board
     public sealed class BoardTileView : MonoBehaviour
     {
         private Image _background;
-        private Text _label;
+        private TMP_Text _label;
         private Button _button;
         private Action<int> _clickHandler;
         private BoardCell _cell;
@@ -18,7 +19,7 @@ namespace Game.Gameplay.Board
         private bool _isHinted;
         private int _index;
 
-        public static BoardTileView Create(Transform parent, Font font, Action<int> clickHandler)
+        public static BoardTileView Create(Transform parent, TMP_FontAsset font, Action<int> clickHandler)
         {
             var tileObject = new GameObject(
                 "BoardTile",
@@ -36,7 +37,7 @@ namespace Game.Gameplay.Board
             tileButton.transition = Selectable.Transition.None;
             tileButton.targetGraphic = tileImage;
 
-            var labelObject = new GameObject("Label", typeof(RectTransform), typeof(Text));
+            var labelObject = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
             labelObject.transform.SetParent(tileObject.transform, false);
 
             var labelRect = (RectTransform)labelObject.transform;
@@ -45,16 +46,17 @@ namespace Game.Gameplay.Board
             labelRect.offsetMin = Vector2.zero;
             labelRect.offsetMax = Vector2.zero;
 
-            var label = labelObject.GetComponent<Text>();
+            var label = labelObject.GetComponent<TextMeshProUGUI>();
             label.font = font;
-            label.fontStyle = FontStyle.Bold;
-            label.fontSize = 32;
-            label.alignment = TextAnchor.MiddleCenter;
+            label.fontStyle = FontStyles.Bold;
+            label.fontSize = 88;
+            label.alignment = TextAlignmentOptions.Center;
             label.color = GamePalette.BoardTileText;
             label.raycastTarget = false;
-            label.resizeTextForBestFit = true;
-            label.resizeTextMinSize = 18;
-            label.resizeTextMaxSize = 42;
+            label.enableAutoSizing = true;
+            label.fontSizeMin = 54;
+            label.fontSizeMax = 88;
+            label.enableWordWrapping = false;
 
             var tileView = tileObject.GetComponent<BoardTileView>();
             tileView.Setup(tileImage, label, tileButton, clickHandler);
@@ -98,7 +100,7 @@ namespace Game.Gameplay.Board
             }
         }
 
-        private void Setup(Image background, Text label, Button button, Action<int> clickHandler)
+        private void Setup(Image background, TMP_Text label, Button button, Action<int> clickHandler)
         {
             _background = background;
             _label = label;
