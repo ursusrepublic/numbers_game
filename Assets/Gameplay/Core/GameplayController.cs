@@ -5,6 +5,7 @@ using Game.Gameplay.Board;
 using Game.Gameplay.Dev;
 using Game.Gameplay.Score;
 using Game.Gameplay.Stage;
+using Game.UI.Game;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -18,7 +19,7 @@ namespace Game.Gameplay.Core
     public sealed class GameplayController : MonoBehaviour
     {
         private BoardState _boardState;
-        private BoardView _boardView;
+        private GameScreenView _gameScreenView;
         private DevPanelView _devPanelView;
         private BoardMatchRules _boardMatchRules;
         private BoardPairFinder _boardPairFinder;
@@ -71,17 +72,17 @@ namespace Game.Gameplay.Core
             EnsureEventSystem();
 
             Transform canvasTransform = CreateCanvas();
-            _boardView = BoardView.Create(canvasTransform, _columns, _regularFont, _boldFont);
-            _boardView.TileClicked += OnTileClicked;
-            _boardView.PlusClicked += OnPlusClicked;
-            _boardView.HintClicked += OnHintClicked;
-            _boardView.RestartClicked += OnRestartClicked;
-            _boardView.SetCells(_boardState.Cells);
-            _boardView.ScrollToTop();
-            _boardView.SetScore(_scoreService.TotalScore);
+            _gameScreenView = GameScreenView.Create(canvasTransform, _columns, _regularFont, _boldFont);
+            _gameScreenView.TileClicked += OnTileClicked;
+            _gameScreenView.PlusClicked += OnPlusClicked;
+            _gameScreenView.HintClicked += OnHintClicked;
+            _gameScreenView.RestartClicked += OnRestartClicked;
+            _gameScreenView.SetCells(_boardState.Cells);
+            _gameScreenView.ScrollToTop();
+            _gameScreenView.SetScore(_scoreService.TotalScore);
             UpdateAdditionsUi();
-            _boardView.SetHintButtonLocked(false);
-            _boardView.HideGameOver();
+            _gameScreenView.SetHintButtonLocked(false);
+            _gameScreenView.HideGameOver();
 
             if (_appMode == AppMode.Developer)
             {
@@ -107,12 +108,12 @@ namespace Game.Gameplay.Core
 
         private void OnDestroy()
         {
-            if (_boardView != null)
+            if (_gameScreenView != null)
             {
-                _boardView.TileClicked -= OnTileClicked;
-                _boardView.PlusClicked -= OnPlusClicked;
-                _boardView.HintClicked -= OnHintClicked;
-                _boardView.RestartClicked -= OnRestartClicked;
+                _gameScreenView.TileClicked -= OnTileClicked;
+                _gameScreenView.PlusClicked -= OnPlusClicked;
+                _gameScreenView.HintClicked -= OnHintClicked;
+                _gameScreenView.RestartClicked -= OnRestartClicked;
             }
 
             if (_devPanelView != null)
@@ -132,7 +133,7 @@ namespace Game.Gameplay.Core
             if (_selectedCellIndex == index)
             {
                 _boardState.SetSelected(index, false);
-                _boardView.RefreshCell(_boardState.Cells[index]);
+                _gameScreenView.RefreshCell(_boardState.Cells[index]);
                 _selectedCellIndex = null;
                 Debug.Log($"GameplayController: Deselected {DescribeCell(_boardState.Cells[index])}.");
                 return;
@@ -155,8 +156,8 @@ namespace Game.Gameplay.Core
                 _boardState.SetSelected(index, true);
                 _selectedCellIndex = index;
 
-                _boardView.RefreshCell(_boardState.Cells[firstIndex]);
-                _boardView.RefreshCell(_boardState.Cells[index]);
+                _gameScreenView.RefreshCell(_boardState.Cells[firstIndex]);
+                _gameScreenView.RefreshCell(_boardState.Cells[index]);
 
                 Debug.Log(
                     $"GameplayController: Invalid pair {DescribeCell(firstCell)} -> {DescribeCell(secondCell)}. " +
@@ -165,7 +166,7 @@ namespace Game.Gameplay.Core
             }
 
             _boardState.SetSelected(index, true);
-            _boardView.RefreshCell(_boardState.Cells[index]);
+            _gameScreenView.RefreshCell(_boardState.Cells[index]);
             _selectedCellIndex = index;
             Debug.Log($"GameplayController: Selected {DescribeCell(_boardState.Cells[index])}.");
         }
@@ -183,16 +184,16 @@ namespace Game.Gameplay.Core
             int addedCount = _boardState.DuplicateUnmatchedNumbers();
             if (addedCount <= 0)
             {
-                _boardView.ShowTooltip("Board is empty. '+' needs active numbers to duplicate.");
+                _gameScreenView.ShowTooltip("Board is empty. '+' needs active numbers to duplicate.");
                 Debug.Log("GameplayController: '+' pressed, but there were no active numbers to duplicate.");
                 return;
             }
 
             _remainingAdditions--;
             UpdateAdditionsUi();
-            _boardView.SetCells(_boardState.Cells);
-            _boardView.ScrollToBottom();
-            _boardView.ShowTooltip($"Added {addedCount} numbers.");
+            _gameScreenView.SetCells(_boardState.Cells);
+            _gameScreenView.ScrollToBottom();
+            _gameScreenView.ShowTooltip($"Added {addedCount} numbers.");
 
             Debug.Log(
                 $"GameplayController: '+' duplicated {addedCount} active numbers. " +
@@ -204,7 +205,7 @@ namespace Game.Gameplay.Core
 
         private void OnHintClicked()
         {
-            if (_sessionState == GameSessionState.GameOver || _boardState == null || _boardView == null)
+            if (_sessionState == GameSessionState.GameOver || _boardState == null || _gameScreenView == null)
             {
                 return;
             }
@@ -213,22 +214,22 @@ namespace Game.Gameplay.Core
 
             if (_hintedPair != null)
             {
-                _boardView.ReplayHintFeedback();
+                _gameScreenView.ReplayHintFeedback();
                 return;
             }
 
             List<BoardMatchInfo> pairs = _boardPairFinder.FindAll(_boardState.Cells, _columns);
             if (pairs.Count == 0)
             {
-                _boardView.ShowTooltip("No more pairs. Please tap '+' button to add numbers.");
+                _gameScreenView.ShowTooltip("No more pairs. Please tap '+' button to add numbers.");
                 Debug.Log("GameplayController: Hint requested, but the board has no valid pairs.");
                 return;
             }
 
             _hintedPair = pairs[_runtimeRandom.Next(pairs.Count)];
-            _boardView.ShowHint(_hintedPair);
-            _boardView.SetHintButtonLocked(true);
-            _boardView.ShowTooltip("Hint highlighted.");
+            _gameScreenView.ShowHint(_hintedPair);
+            _gameScreenView.SetHintButtonLocked(true);
+            _gameScreenView.ShowTooltip("Hint highlighted.");
 
             Debug.Log(
                 $"GameplayController: Hint highlighted {DescribePair(_hintedPair.FirstIndex, _hintedPair.SecondIndex)}.");
@@ -242,23 +243,23 @@ namespace Game.Gameplay.Core
 
             if (resolution.NewlyClearedRowCount > 0)
             {
-                _boardView.SetCells(_boardState.Cells);
+                _gameScreenView.SetCells(_boardState.Cells);
             }
             else
             {
                 if (resolution.FirstIndex >= 0 && resolution.FirstIndex < _boardState.Cells.Count)
                 {
-                    _boardView.RefreshCell(_boardState.Cells[resolution.FirstIndex]);
+                    _gameScreenView.RefreshCell(_boardState.Cells[resolution.FirstIndex]);
                 }
 
                 if (resolution.SecondIndex >= 0 && resolution.SecondIndex < _boardState.Cells.Count)
                 {
-                    _boardView.RefreshCell(_boardState.Cells[resolution.SecondIndex]);
+                    _gameScreenView.RefreshCell(_boardState.Cells[resolution.SecondIndex]);
                 }
             }
 
             ScoreResult scoreResult = _scoreService.ApplyMatch(resolution, _stageState.Multiplier);
-            _boardView.SetScore(scoreResult.TotalScore);
+            _gameScreenView.SetScore(scoreResult.TotalScore);
 
             Debug.Log(
                 $"GameplayController: Matched {DescribeCell(firstCell)} with {DescribeCell(secondCell)} " +
@@ -273,7 +274,7 @@ namespace Game.Gameplay.Core
                 _remainingAdditions = _startingAdditions;
                 UpdateAdditionsUi();
                 StartNextStageBoard();
-                _boardView.ShowTooltip($"Board cleared. Stage {_stageState.Stage}. Additions reset to {_startingAdditions}.");
+                _gameScreenView.ShowTooltip($"Board cleared. Stage {_stageState.Stage}. Additions reset to {_startingAdditions}.");
 
                 Debug.Log(
                     $"GameplayController: Board cleared. Stage is now {_stageState.Stage}. " +
@@ -281,7 +282,7 @@ namespace Game.Gameplay.Core
             }
             else if (resolution.NewlyClearedRowCount > 0)
             {
-                _boardView.ShowTooltip($"Removed {resolution.NewlyClearedRowCount} row(s).");
+                _gameScreenView.ShowTooltip($"Removed {resolution.NewlyClearedRowCount} row(s).");
                 Debug.Log(
                     $"GameplayController: Removed {resolution.NewlyClearedRowCount} matched row(s). " +
                     $"Rows below shifted up.");
@@ -303,7 +304,7 @@ namespace Game.Gameplay.Core
 
             if (selectedIndex >= 0 && selectedIndex < _boardState.Cells.Count)
             {
-                _boardView.RefreshCell(_boardState.Cells[selectedIndex]);
+                _gameScreenView.RefreshCell(_boardState.Cells[selectedIndex]);
             }
 
             _selectedCellIndex = null;
@@ -313,24 +314,24 @@ namespace Game.Gameplay.Core
         {
             _hintedPair = null;
 
-            if (_boardView == null)
+            if (_gameScreenView == null)
             {
                 return;
             }
 
-            _boardView.ClearHint();
-            _boardView.SetHintButtonLocked(false);
+            _gameScreenView.ClearHint();
+            _gameScreenView.SetHintButtonLocked(false);
         }
 
         private void UpdateAdditionsUi()
         {
-            if (_boardView == null)
+            if (_gameScreenView == null)
             {
                 return;
             }
 
-            _boardView.SetAdditions(_remainingAdditions);
-            _boardView.SetPlusButtonInteractable(CanUsePlus());
+            _gameScreenView.SetAdditions(_remainingAdditions);
+            _gameScreenView.SetPlusButtonInteractable(CanUsePlus());
         }
 
         private BoardState CreateBoardState(int seed)
@@ -346,8 +347,8 @@ namespace Game.Gameplay.Core
             int nextBoardSeed = _boardSeedRandom.Next();
             _boardState = CreateBoardState(nextBoardSeed);
             UpdateAdditionsUi();
-            _boardView.SetCells(_boardState.Cells);
-            _boardView.ScrollToTop();
+            _gameScreenView.SetCells(_boardState.Cells);
+            _gameScreenView.ScrollToTop();
 
             Debug.Log(
                 $"GameplayController: Generated stage {_stageState.Stage} board with {_boardState.Cells.Count} cells, " +
@@ -356,7 +357,7 @@ namespace Game.Gameplay.Core
 
         private void OnShowDeveloperPairsClicked()
         {
-            if (_boardState == null || _boardView == null)
+            if (_boardState == null || _gameScreenView == null)
             {
                 return;
             }
@@ -364,20 +365,20 @@ namespace Game.Gameplay.Core
             List<BoardMatchInfo> pairs = GetValidPairs();
             if (pairs.Count == 0)
             {
-                _boardView.ClearDeveloperPairLines();
-                _boardView.ShowTooltip("Developer: no valid pairs on the current board.");
+                _gameScreenView.ClearDeveloperPairLines();
+                _gameScreenView.ShowTooltip("Developer: no valid pairs on the current board.");
                 UpdateDeveloperInfo(0);
                 return;
             }
 
-            _boardView.ShowDeveloperPairLines(pairs);
-            _boardView.ShowTooltip($"Developer: showing {pairs.Count} valid pair(s).");
+            _gameScreenView.ShowDeveloperPairLines(pairs);
+            _gameScreenView.ShowTooltip($"Developer: showing {pairs.Count} valid pair(s).");
             UpdateDeveloperInfo(pairs.Count);
         }
 
         private void OnSolveOnePairClicked()
         {
-            if (_sessionState == GameSessionState.GameOver || _boardState == null || _boardView == null)
+            if (_sessionState == GameSessionState.GameOver || _boardState == null || _gameScreenView == null)
             {
                 return;
             }
@@ -385,7 +386,7 @@ namespace Game.Gameplay.Core
             List<BoardMatchInfo> pairs = GetValidPairs();
             if (pairs.Count == 0)
             {
-                _boardView.ShowTooltip("Developer: no valid pairs to solve.");
+                _gameScreenView.ShowTooltip("Developer: no valid pairs to solve.");
                 UpdateDeveloperInfo(0);
                 return;
             }
@@ -400,7 +401,7 @@ namespace Game.Gameplay.Core
             BoardMatchResolution resolution = _boardState.TryMatchPair(pairToSolve.FirstIndex, pairToSolve.SecondIndex);
             if (!resolution.Success)
             {
-                _boardView.ShowTooltip("Developer: failed to solve the selected pair.");
+                _gameScreenView.ShowTooltip("Developer: failed to solve the selected pair.");
                 UpdateDeveloperInfo();
                 return;
             }
@@ -412,13 +413,13 @@ namespace Game.Gameplay.Core
 
             if (showSolvedTooltip)
             {
-                _boardView.ShowTooltip("Developer: solved one valid pair.");
+                _gameScreenView.ShowTooltip("Developer: solved one valid pair.");
             }
         }
 
         private void EvaluateSessionState(bool showNoMovesTooltip)
         {
-            if (_boardState == null || _boardView == null)
+            if (_boardState == null || _gameScreenView == null)
             {
                 return;
             }
@@ -446,7 +447,7 @@ namespace Game.Gameplay.Core
 
             if (_sessionState == GameSessionState.Playing)
             {
-                _boardView.HideGameOver();
+                _gameScreenView.HideGameOver();
                 return;
             }
 
@@ -454,7 +455,7 @@ namespace Game.Gameplay.Core
             {
                 if (showNoMovesTooltip)
                 {
-                    _boardView.ShowTooltip("No more pairs. Please tap '+' button to add numbers.");
+                    _gameScreenView.ShowTooltip("No more pairs. Please tap '+' button to add numbers.");
                 }
 
                 Debug.Log(
@@ -465,7 +466,7 @@ namespace Game.Gameplay.Core
 
             ClearCurrentSelection();
             ClearHint();
-            _boardView.ShowGameOver(_scoreService.TotalScore, _stageState.Stage);
+            _gameScreenView.ShowGameOver(_scoreService.TotalScore, _stageState.Stage);
 
             Debug.Log(
                 $"GameplayController: Game Over. Final score {_scoreService.TotalScore}, " +
@@ -504,7 +505,7 @@ namespace Game.Gameplay.Core
 
         private void ClearDeveloperPairLines()
         {
-            _boardView?.ClearDeveloperPairLines();
+            _gameScreenView?.ClearDeveloperPairLines();
         }
 
         private void UpdateDeveloperInfo(int? validPairCount = null)

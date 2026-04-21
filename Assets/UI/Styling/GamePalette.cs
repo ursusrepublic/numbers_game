@@ -48,6 +48,8 @@ namespace Game.UI.Styling
         public static readonly Color DisabledText = new Color(1f, 1f, 1f, 0.65f);
         public static readonly Color LockedText = new Color(1f, 1f, 1f, 0.82f);
         public static readonly Color DeveloperPairLine = new Color(1f, 0.42f, 0.18f, 0.55f);
+        public static readonly Color AdSlotBackground = new Color(0.9490f, 0.9333f, 0.9098f, 1f);
+        public static readonly Color AdSlotBorder = new Color(0.8667f, 0.8314f, 0.7922f, 1f);
 
         public static readonly Color GameOverOverlay = new Color(0.05f, 0.06f, 0.09f, 0.84f);
 
