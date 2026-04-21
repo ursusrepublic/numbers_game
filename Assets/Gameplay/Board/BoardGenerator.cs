@@ -8,6 +8,13 @@ namespace Game.Gameplay.Board
     public sealed class BoardGenerator
     {
         private const int MaxGenerateAttempts = 4096;
+        
+        private static readonly int[] FallbackBoard =
+        {
+            9, 5, 6, 3, 7, 6, 9, 5, 9,
+            2, 1, 5, 6, 8, 5, 2, 3, 6,
+            2, 3, 3, 1, 1, 7, 6, 1, 6,
+        };
 
         private static readonly (int FirstNumber, int SecondNumber)[] PairNumberOptions =
         {
@@ -44,9 +51,8 @@ namespace Game.Gameplay.Board
                 return BuildCells(numbers, safeColumns);
             }
 
-            throw new InvalidOperationException(
-                $"BoardGenerator: Could not generate a board with exactly {safeTargetPairCount} starting pairs. " +
-                "Try lowering the pair count or increasing the board size.");
+            // if we don't generate board in MaxGenerateAttempts we return predefined FallBackBoard
+            return BuildCells(FallbackBoard, safeColumns);
         }
 
         private bool TryGenerateNumbers(int columns, int rows, int targetPairCount, out int[] numbers)
