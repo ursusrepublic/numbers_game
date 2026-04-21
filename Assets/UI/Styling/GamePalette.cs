@@ -47,9 +47,9 @@ namespace Game.UI.Styling
         public static readonly Color BoardTileClearedBackground = new Color(1.00f, 1.00f, 1.00f, 1.0f);
         public static readonly Color BoardTileHintBackground = new Color(0.98f, 0.88f, 0.82f, 1.0f);
         public static readonly Color BoardTileHintPulseBackground = new Color(0.86f, 0.97f, 0.84f, 1f);
-        public static readonly Color BoardTileText = new Color(0.16f, 0.15f, 0.14f, 1.0f);
-        public static readonly Color GridLineColor = new Color(0.88f, 0.85f, 0.80f, 1.0f);
-        public static readonly Color InactiveNumberColor = new Color(0.86f, 0.84f, 0.82f, 1.0f);
+        public static readonly Color BoardTileText = new Color(0.1814f, 0.1668f, 0.1623f, 1f);
+        public static readonly Color GridLineColor = new Color(0.8856f, 0.8798f, 0.8785f, 1f);
+        public static readonly Color InactiveNumberColor = new Color(0.9061f, 0.9062f, 0.9180f, 1f);
 
         public static readonly Color HudPanelBackground = new Color(0.16f, 0.18f, 0.24f, 0.96f);
         public static readonly Color BoardScrollBackground = new Color(0.97f, 0.95f, 0.92f, 1f);
