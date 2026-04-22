@@ -56,7 +56,7 @@ namespace Game.Gameplay.Board
             label.enableAutoSizing = true;
             label.fontSizeMin = 54;
             label.fontSizeMax = 88;
-            label.enableWordWrapping = false;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
 
             var tileView = tileObject.GetComponent<BoardTileView>();
             tileView.Setup(tileImage, label, tileButton, clickHandler);

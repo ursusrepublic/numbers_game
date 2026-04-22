@@ -102,7 +102,7 @@ namespace Game.UI.Ad
             label.font = regularFont != null ? regularFont : TMP_Settings.defaultFontAsset;
             label.fontSize = 34f;
             label.enableAutoSizing = false;
-            label.enableWordWrapping = false;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
             label.alignment = TextAlignmentOptions.Center;
             label.color = GamePalette.BoardTileText;
             label.text = "Ad Banner Placeholder";

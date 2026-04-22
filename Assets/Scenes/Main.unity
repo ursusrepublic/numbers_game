@@ -369,7 +369,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fdd3695ddc92409cb5978bf7b011fd63, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _appMode: 0
+  _appMode: 1
   _boardColumns: 9
   _initialRows: 3
   _startingPairs: 8
@@ -377,6 +377,8 @@ MonoBehaviour:
   _startingAdditions: 5
   _regularFont: {fileID: 11400000, guid: 897e91f298be74061b76773842449d3d, type: 2}
   _boldFont: {fileID: 11400000, guid: 572baca8bc799483b8f01d62ae1a1575, type: 2}
+  _plusIconTexture: {fileID: 2800000, guid: 8504a71574c01451085f2bd94eca4970, type: 3}
+  _hintIconTexture: {fileID: 2800000, guid: df35d9350658f46298f6da38de59f3b4, type: 3}
 --- !u!4 &900000002
 Transform:
   m_ObjectHideFlags: 0

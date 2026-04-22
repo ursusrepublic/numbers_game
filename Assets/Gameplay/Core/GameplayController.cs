@@ -39,6 +39,8 @@ namespace Game.Gameplay.Core
         private GameSessionState _sessionState;
         private TMP_FontAsset _regularFont;
         private TMP_FontAsset _boldFont;
+        private Texture2D _plusIconTexture;
+        private Texture2D _hintIconTexture;
 
         public void Initialize(
             AppMode appMode,
@@ -48,7 +50,9 @@ namespace Game.Gameplay.Core
             int randomSeed,
             int startingAdditions,
             TMP_FontAsset regularFont,
-            TMP_FontAsset boldFont)
+            TMP_FontAsset boldFont,
+            Texture2D plusIconTexture,
+            Texture2D hintIconTexture)
         {
             _appMode = appMode;
             _columns = Mathf.Max(1, columns);
@@ -68,11 +72,19 @@ namespace Game.Gameplay.Core
             _remainingAdditions = _startingAdditions;
             _regularFont = regularFont != null ? regularFont : boldFont != null ? boldFont : TMP_Settings.defaultFontAsset;
             _boldFont = boldFont != null ? boldFont : _regularFont;
+            _plusIconTexture = plusIconTexture;
+            _hintIconTexture = hintIconTexture;
 
             EnsureEventSystem();
 
             Transform canvasTransform = CreateCanvas();
-            _gameScreenView = GameScreenView.Create(canvasTransform, _columns, _regularFont, _boldFont);
+            _gameScreenView = GameScreenView.Create(
+                canvasTransform,
+                _columns,
+                _regularFont,
+                _boldFont,
+                _plusIconTexture,
+                _hintIconTexture);
             _gameScreenView.TileClicked += OnTileClicked;
             _gameScreenView.PlusClicked += OnPlusClicked;
             _gameScreenView.HintClicked += OnHintClicked;
@@ -585,7 +597,7 @@ namespace Game.Gameplay.Core
 
         private void EnsureEventSystem()
         {
-            if (UnityEngine.Object.FindFirstObjectByType<EventSystem>() != null)
+            if (UnityEngine.Object.FindAnyObjectByType<EventSystem>() != null)
             {
                 return;
             }

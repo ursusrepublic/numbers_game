@@ -167,7 +167,7 @@ namespace Game.Gameplay.Dev
             label.alignment = ConvertAlignment(alignment);
             label.color = color;
             label.enableAutoSizing = false;
-            label.enableWordWrapping = true;
+            label.textWrappingMode = TextWrappingModes.Normal;
             label.overflowMode = TextOverflowModes.Overflow;
         }
 

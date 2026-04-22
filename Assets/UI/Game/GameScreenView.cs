@@ -13,25 +13,31 @@ namespace Game.UI.Game
     [DisallowMultipleComponent]
     public sealed class GameScreenView : MonoBehaviour
     {
-        private const float BoardTopInset = 236f;
+        private const float TopAreaHeight = 204f;
+        private const float BottomControlsHeight = 148f;
         private const float ControlsToAdSpacing = 5f;
         private const float DefaultAdHeight = 50f;
+        private const int DefaultHintBadgeValue = 9;
+
+        private static Sprite _circleSprite;
 
         private RectTransform _boardAreaRect;
+        private RectTransform _bottomControlsRect;
         private RectTransform _gameOverOverlayRect;
         private BoardView _boardView;
         private AdSlotView _adSlotView;
         private Button _plusButton;
         private Button _hintButton;
         private Button _restartButton;
-        private Image _plusButtonImage;
-        private Image _hintButtonImage;
+        private Image _plusButtonBackgroundImage;
+        private Image _hintButtonBackgroundImage;
         private Image _restartButtonImage;
-        private TMP_Text _scoreLabel;
-        private TMP_Text _additionsLabel;
+        private Image _plusIconImage;
+        private Image _hintIconImage;
+        private TMP_Text _scoreValueLabel;
         private TMP_Text _tooltipLabel;
-        private TMP_Text _plusButtonLabel;
-        private TMP_Text _hintButtonLabel;
+        private TMP_Text _plusBadgeLabel;
+        private TMP_Text _hintBadgeLabel;
         private GameObject _gameOverOverlay;
         private TMP_Text _gameOverScoreLabel;
         private TMP_Text _gameOverStageLabel;
@@ -43,7 +49,13 @@ namespace Game.UI.Game
         public event Action HintClicked;
         public event Action RestartClicked;
 
-        public static GameScreenView Create(Transform parent, int columns, TMP_FontAsset regularFont, TMP_FontAsset boldFont)
+        public static GameScreenView Create(
+            Transform parent,
+            int columns,
+            TMP_FontAsset regularFont,
+            TMP_FontAsset boldFont,
+            Texture2D plusIconTexture,
+            Texture2D hintIconTexture)
         {
             var screenObject = new GameObject(
                 "GameScreenView",
@@ -74,39 +86,33 @@ namespace Game.UI.Game
             var backgroundImage = backgroundObject.GetComponent<Image>();
             backgroundImage.color = GamePalette.GameBackground;
 
-            var hudPanelObject = new GameObject(
-                "HudPanel",
-                typeof(RectTransform),
-                typeof(Image));
+            var topAreaObject = new GameObject("TopArea", typeof(RectTransform));
+            topAreaObject.transform.SetParent(screenObject.transform, false);
 
-            hudPanelObject.transform.SetParent(screenObject.transform, false);
+            var topAreaRect = (RectTransform)topAreaObject.transform;
+            topAreaRect.anchorMin = new Vector2(0f, 1f);
+            topAreaRect.anchorMax = new Vector2(1f, 1f);
+            topAreaRect.pivot = new Vector2(0.5f, 1f);
+            topAreaRect.sizeDelta = new Vector2(0f, TopAreaHeight);
+            topAreaRect.anchoredPosition = Vector2.zero;
 
-            var hudPanelRect = (RectTransform)hudPanelObject.transform;
-            hudPanelRect.anchorMin = new Vector2(0f, 1f);
-            hudPanelRect.anchorMax = new Vector2(1f, 1f);
-            hudPanelRect.pivot = new Vector2(0.5f, 1f);
-            hudPanelRect.offsetMin = new Vector2(0f, -220f);
-            hudPanelRect.offsetMax = new Vector2(0f, -32f);
+            TMP_Text scoreValueLabel = CreateTextElement(topAreaObject.transform, "ScoreValue");
+            ConfigureRect(
+                (RectTransform)scoreValueLabel.transform,
+                new Vector2(0.5f, 1f),
+                new Vector2(0.5f, 1f),
+                new Vector2(0.5f, 1f),
+                new Vector2(260f, 84f),
+                new Vector2(0f, -84f));
 
-            var hudPanelImage = hudPanelObject.GetComponent<Image>();
-            hudPanelImage.color = GamePalette.HudPanelBackground;
-
-            TMP_Text scoreLabel = CreateTextElement(hudPanelObject.transform, "ScoreLabel");
-            ConfigureRect((RectTransform)scoreLabel.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(320f, 52f), new Vector2(20f, -18f));
-
-            TMP_Text additionsLabel = CreateTextElement(hudPanelObject.transform, "AdditionsLabel");
-            ConfigureRect((RectTransform)additionsLabel.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(220f, 40f), new Vector2(20f, -78f));
-
-            (Button hintButton, Image hintButtonImage, TMP_Text hintButtonLabel) = CreateButton(hudPanelObject.transform, "HintButton", "Hint");
-            ConfigureRect((RectTransform)hintButton.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(136f, 52f), new Vector2(-152f, -18f));
-
-            (Button plusButton, Image plusButtonImage, TMP_Text plusButtonLabel) = CreateButton(hudPanelObject.transform, "PlusButton", "+");
-            ConfigureRect((RectTransform)plusButton.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(120f, 52f), new Vector2(-20f, -18f));
-
-            TMP_Text tooltipLabel = CreateTextElement(hudPanelObject.transform, "TooltipLabel");
-            ConfigureRect((RectTransform)tooltipLabel.transform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), Vector2.zero, Vector2.zero);
-            ((RectTransform)tooltipLabel.transform).offsetMin = new Vector2(20f, 18f);
-            ((RectTransform)tooltipLabel.transform).offsetMax = new Vector2(-20f, 66f);
+            TMP_Text tooltipLabel = CreateTextElement(topAreaObject.transform, "TooltipLabel");
+            ConfigureRect(
+                (RectTransform)tooltipLabel.transform,
+                new Vector2(0.5f, 1f),
+                new Vector2(0.5f, 1f),
+                new Vector2(0.5f, 1f),
+                new Vector2(760f, 48f),
+                new Vector2(0f, -158f));
 
             var boardAreaObject = new GameObject("BoardArea", typeof(RectTransform));
             boardAreaObject.transform.SetParent(screenObject.transform, false);
@@ -114,10 +120,52 @@ namespace Game.UI.Game
             var boardAreaRect = (RectTransform)boardAreaObject.transform;
             boardAreaRect.anchorMin = Vector2.zero;
             boardAreaRect.anchorMax = Vector2.one;
-            boardAreaRect.offsetMin = new Vector2(0f, DefaultAdHeight + ControlsToAdSpacing);
-            boardAreaRect.offsetMax = new Vector2(0f, -BoardTopInset);
+            boardAreaRect.offsetMin = new Vector2(0f, DefaultAdHeight + ControlsToAdSpacing + BottomControlsHeight);
+            boardAreaRect.offsetMax = new Vector2(0f, -TopAreaHeight);
 
             BoardView boardView = BoardView.Create(boardAreaObject.transform, columns, regularFont, boldFont);
+
+            var bottomControlsObject = new GameObject("BottomControls", typeof(RectTransform));
+            bottomControlsObject.transform.SetParent(screenObject.transform, false);
+
+            var bottomControlsRect = (RectTransform)bottomControlsObject.transform;
+            bottomControlsRect.anchorMin = new Vector2(0f, 0f);
+            bottomControlsRect.anchorMax = new Vector2(1f, 0f);
+            bottomControlsRect.pivot = new Vector2(0.5f, 0f);
+            bottomControlsRect.sizeDelta = new Vector2(0f, BottomControlsHeight);
+            bottomControlsRect.anchoredPosition = new Vector2(0f, DefaultAdHeight + ControlsToAdSpacing);
+
+            var controlsRowObject = new GameObject(
+                "ControlsRow",
+                typeof(RectTransform),
+                typeof(HorizontalLayoutGroup));
+
+            controlsRowObject.transform.SetParent(bottomControlsObject.transform, false);
+
+            var controlsRowRect = (RectTransform)controlsRowObject.transform;
+            controlsRowRect.anchorMin = new Vector2(0.5f, 0.5f);
+            controlsRowRect.anchorMax = new Vector2(0.5f, 0.5f);
+            controlsRowRect.pivot = new Vector2(0.5f, 0.5f);
+            controlsRowRect.sizeDelta = new Vector2(360f, 132f);
+            controlsRowRect.anchoredPosition = new Vector2(0f, 6f);
+
+            var controlsLayout = controlsRowObject.GetComponent<HorizontalLayoutGroup>();
+            controlsLayout.childAlignment = TextAnchor.MiddleCenter;
+            controlsLayout.spacing = 44f;
+            controlsLayout.padding = new RectOffset(0, 0, 0, 0);
+            controlsLayout.childForceExpandHeight = false;
+            controlsLayout.childForceExpandWidth = false;
+            controlsLayout.childControlHeight = false;
+            controlsLayout.childControlWidth = false;
+
+            Sprite plusIconSprite = CreateTextureSprite(plusIconTexture);
+            Sprite hintIconSprite = CreateTextureSprite(hintIconTexture);
+
+            (Button plusButton, Image plusButtonBackgroundImage, Image plusIconImage, TMP_Text plusBadgeLabel) =
+                CreateActionButton(controlsRowObject.transform, "PlusButton", plusIconSprite, "+", regularFont);
+
+            (Button hintButton, Image hintButtonBackgroundImage, Image hintIconImage, TMP_Text hintBadgeLabel) =
+                CreateActionButton(controlsRowObject.transform, "HintButton", hintIconSprite, "?", regularFont);
 
             AdSlotView adSlotView = AdSlotView.Create(screenObject.transform, regularFont);
 
@@ -164,24 +212,28 @@ namespace Game.UI.Game
             TMP_Text gameOverStageLabel = CreateTextElement(panelObject.transform, "StageLabel");
             ConfigureRect((RectTransform)gameOverStageLabel.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(520f, 56f), new Vector2(0f, -230f));
 
-            (Button restartButton, Image restartButtonImage, TMP_Text restartButtonLabel) = CreateButton(panelObject.transform, "RestartButton", "Restart");
+            (Button restartButton, Image restartButtonImage, TMP_Text restartButtonLabel) =
+                CreateTextButton(panelObject.transform, "RestartButton", "Restart");
+
             ConfigureRect((RectTransform)restartButton.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(260f, 64f), new Vector2(0f, 54f));
 
             var screenView = screenObject.GetComponent<GameScreenView>();
             screenView.Setup(
                 boardAreaRect,
+                bottomControlsRect,
                 overlayRect,
                 boardView,
                 adSlotView,
-                scoreLabel,
-                additionsLabel,
+                scoreValueLabel,
                 tooltipLabel,
                 plusButton,
-                plusButtonImage,
-                plusButtonLabel,
+                plusButtonBackgroundImage,
+                plusIconImage,
+                plusBadgeLabel,
                 hintButton,
-                hintButtonImage,
-                hintButtonLabel,
+                hintButtonBackgroundImage,
+                hintIconImage,
+                hintBadgeLabel,
                 overlayObject,
                 gameOverScoreLabel,
                 gameOverStageLabel,
@@ -207,41 +259,49 @@ namespace Game.UI.Game
 
         public void SetScore(int totalScore)
         {
-            if (_scoreLabel != null)
+            if (_scoreValueLabel != null)
             {
-                _scoreLabel.text = $"Score: {totalScore}";
+                _scoreValueLabel.text = totalScore.ToString();
             }
         }
 
         public void SetAdditions(int remainingAdditions)
         {
-            if (_additionsLabel != null)
+            if (_plusBadgeLabel != null)
             {
-                _additionsLabel.text = $"Additions: {remainingAdditions}";
+                _plusBadgeLabel.text = remainingAdditions.ToString();
             }
         }
 
         public void SetPlusButtonInteractable(bool interactable)
         {
-            if (_plusButton == null || _plusButtonImage == null || _plusButtonLabel == null)
+            if (_plusButton == null || _plusButtonBackgroundImage == null || _plusIconImage == null)
             {
                 return;
             }
 
             _plusButton.interactable = interactable;
-            _plusButtonImage.color = interactable ? GamePalette.PrimaryButton : GamePalette.DisabledButton;
-            _plusButtonLabel.color = interactable ? GamePalette.PrimaryText : GamePalette.DisabledText;
+            _plusButtonBackgroundImage.color = interactable
+                ? GamePalette.ActionButtonSurface
+                : GamePalette.ActionButtonSurfaceDisabled;
+            _plusIconImage.color = interactable
+                ? GamePalette.ActionButtonIcon
+                : GamePalette.ActionButtonIconDisabled;
         }
 
         public void SetHintButtonLocked(bool isLocked)
         {
-            if (_hintButtonImage == null || _hintButtonLabel == null)
+            if (_hintButtonBackgroundImage == null || _hintIconImage == null)
             {
                 return;
             }
 
-            _hintButtonImage.color = isLocked ? GamePalette.LockedButton : GamePalette.PrimaryButton;
-            _hintButtonLabel.color = isLocked ? GamePalette.LockedText : GamePalette.PrimaryText;
+            _hintButtonBackgroundImage.color = isLocked
+                ? GamePalette.ActionButtonSurfaceDisabled
+                : GamePalette.ActionButtonSurface;
+            _hintIconImage.color = isLocked
+                ? GamePalette.ActionButtonIconDisabled
+                : GamePalette.ActionButtonIcon;
         }
 
         public void ShowHint(BoardMatchInfo matchInfo)
@@ -359,18 +419,20 @@ namespace Game.UI.Game
 
         private void Setup(
             RectTransform boardAreaRect,
+            RectTransform bottomControlsRect,
             RectTransform gameOverOverlayRect,
             BoardView boardView,
             AdSlotView adSlotView,
-            TMP_Text scoreLabel,
-            TMP_Text additionsLabel,
+            TMP_Text scoreValueLabel,
             TMP_Text tooltipLabel,
             Button plusButton,
-            Image plusButtonImage,
-            TMP_Text plusButtonLabel,
+            Image plusButtonBackgroundImage,
+            Image plusIconImage,
+            TMP_Text plusBadgeLabel,
             Button hintButton,
-            Image hintButtonImage,
-            TMP_Text hintButtonLabel,
+            Image hintButtonBackgroundImage,
+            Image hintIconImage,
+            TMP_Text hintBadgeLabel,
             GameObject gameOverOverlay,
             TMP_Text gameOverScoreLabel,
             TMP_Text gameOverStageLabel,
@@ -388,18 +450,20 @@ namespace Game.UI.Game
                     : TMP_Settings.defaultFontAsset;
 
             _boardAreaRect = boardAreaRect;
+            _bottomControlsRect = bottomControlsRect;
             _gameOverOverlayRect = gameOverOverlayRect;
             _boardView = boardView;
             _adSlotView = adSlotView;
-            _scoreLabel = scoreLabel;
-            _additionsLabel = additionsLabel;
+            _scoreValueLabel = scoreValueLabel;
             _tooltipLabel = tooltipLabel;
             _plusButton = plusButton;
-            _plusButtonImage = plusButtonImage;
-            _plusButtonLabel = plusButtonLabel;
+            _plusButtonBackgroundImage = plusButtonBackgroundImage;
+            _plusIconImage = plusIconImage;
+            _plusBadgeLabel = plusBadgeLabel;
             _hintButton = hintButton;
-            _hintButtonImage = hintButtonImage;
-            _hintButtonLabel = hintButtonLabel;
+            _hintButtonBackgroundImage = hintButtonBackgroundImage;
+            _hintIconImage = hintIconImage;
+            _hintBadgeLabel = hintBadgeLabel;
             _gameOverOverlay = gameOverOverlay;
             _gameOverScoreLabel = gameOverScoreLabel;
             _gameOverStageLabel = gameOverStageLabel;
@@ -407,14 +471,14 @@ namespace Game.UI.Game
             _restartButtonImage = restartButtonImage;
             _restartButtonLabel = restartButtonLabel;
 
-            ConfigureLabel(_scoreLabel, effectiveRegularFont, 42, TextAnchor.MiddleLeft, GamePalette.PrimaryText);
-            ConfigureLabel(_additionsLabel, effectiveRegularFont, 30, TextAnchor.MiddleLeft, GamePalette.SecondaryText);
-            ConfigureLabel(_tooltipLabel, effectiveRegularFont, 28, TextAnchor.MiddleCenter, GamePalette.TooltipText);
+            ConfigureLabel(_scoreValueLabel, effectiveRegularFont, 62, TextAnchor.MiddleCenter, GamePalette.ScoreValueText);
+            ConfigureLabel(_tooltipLabel, effectiveRegularFont, 24, TextAnchor.MiddleCenter, GamePalette.ActionButtonIcon);
+            _tooltipLabel.textWrappingMode = TextWrappingModes.Normal;
             _tooltipLabel.enabled = false;
             _tooltipLabel.text = string.Empty;
 
-            ConfigureLabel(_plusButtonLabel, effectiveRegularFont, 34, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
-            ConfigureLabel(_hintButtonLabel, effectiveRegularFont, 28, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
+            ConfigureLabel(_plusBadgeLabel, effectiveRegularFont, 22, TextAnchor.MiddleCenter, GamePalette.ActionButtonBadgeText);
+            ConfigureLabel(_hintBadgeLabel, effectiveRegularFont, 22, TextAnchor.MiddleCenter, GamePalette.ActionButtonBadgeText);
             ConfigureLabel(gameOverTitleLabel, effectiveRegularFont, 48, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
             ConfigureLabel(_gameOverScoreLabel, effectiveRegularFont, 34, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
             ConfigureLabel(_gameOverStageLabel, effectiveRegularFont, 34, TextAnchor.MiddleCenter, GamePalette.SecondaryText);
@@ -428,6 +492,7 @@ namespace Game.UI.Game
 
             SetScore(0);
             SetAdditions(0);
+            SetHintBadge(DefaultHintBadgeValue);
             SetPlusButtonInteractable(true);
             SetHintButtonLocked(false);
             HideGameOver();
@@ -463,14 +528,27 @@ namespace Game.UI.Game
         {
             if (_boardAreaRect != null)
             {
-                _boardAreaRect.offsetMin = new Vector2(0f, adHeight + ControlsToAdSpacing);
-                _boardAreaRect.offsetMax = new Vector2(0f, -BoardTopInset);
+                _boardAreaRect.offsetMin = new Vector2(0f, adHeight + ControlsToAdSpacing + BottomControlsHeight);
+                _boardAreaRect.offsetMax = new Vector2(0f, -TopAreaHeight);
+            }
+
+            if (_bottomControlsRect != null)
+            {
+                _bottomControlsRect.anchoredPosition = new Vector2(0f, adHeight + ControlsToAdSpacing);
             }
 
             if (_gameOverOverlayRect != null)
             {
                 _gameOverOverlayRect.offsetMin = new Vector2(0f, adHeight);
                 _gameOverOverlayRect.offsetMax = Vector2.zero;
+            }
+        }
+
+        private void SetHintBadge(int count)
+        {
+            if (_hintBadgeLabel != null)
+            {
+                _hintBadgeLabel.text = count.ToString();
             }
         }
 
@@ -490,7 +568,102 @@ namespace Game.UI.Game
             return textObject.GetComponent<TextMeshProUGUI>();
         }
 
-        private static (Button Button, Image Image, TMP_Text Label) CreateButton(Transform parent, string name, string labelText)
+        private static (Button Button, Image BackgroundImage, Image IconImage, TMP_Text BadgeLabel) CreateActionButton(
+            Transform parent,
+            string name,
+            Sprite iconSprite,
+            string fallbackText,
+            TMP_FontAsset font)
+        {
+            var buttonObject = new GameObject(
+                name,
+                typeof(RectTransform),
+                typeof(Image),
+                typeof(Button),
+                typeof(LayoutElement));
+
+            buttonObject.transform.SetParent(parent, false);
+
+            var layoutElement = buttonObject.GetComponent<LayoutElement>();
+            layoutElement.preferredWidth = 118f;
+            layoutElement.preferredHeight = 118f;
+            layoutElement.minWidth = 118f;
+            layoutElement.minHeight = 118f;
+
+            var buttonImage = buttonObject.GetComponent<Image>();
+            buttonImage.sprite = GetCircleSprite();
+            buttonImage.color = GamePalette.ActionButtonSurface;
+            buttonImage.type = Image.Type.Simple;
+
+            var button = buttonObject.GetComponent<Button>();
+            button.transition = Selectable.Transition.None;
+            button.targetGraphic = buttonImage;
+
+            var iconObject = new GameObject("Icon", typeof(RectTransform), typeof(Image));
+            iconObject.transform.SetParent(buttonObject.transform, false);
+
+            var iconRect = (RectTransform)iconObject.transform;
+            iconRect.anchorMin = new Vector2(0.5f, 0.5f);
+            iconRect.anchorMax = new Vector2(0.5f, 0.5f);
+            iconRect.pivot = new Vector2(0.5f, 0.5f);
+            iconRect.sizeDelta = new Vector2(56f, 56f);
+            iconRect.anchoredPosition = new Vector2(0f, -2f);
+
+            var iconImage = iconObject.GetComponent<Image>();
+            iconImage.sprite = iconSprite;
+            iconImage.color = GamePalette.ActionButtonIcon;
+            iconImage.preserveAspect = true;
+            iconImage.raycastTarget = false;
+
+            if (iconSprite == null)
+            {
+                TMP_Text fallbackLabel = CreateTextElement(buttonObject.transform, "FallbackLabel");
+                RectTransform fallbackRect = (RectTransform)fallbackLabel.transform;
+                fallbackRect.anchorMin = Vector2.zero;
+                fallbackRect.anchorMax = Vector2.one;
+                fallbackRect.offsetMin = Vector2.zero;
+                fallbackRect.offsetMax = Vector2.zero;
+                fallbackLabel.font = font != null ? font : TMP_Settings.defaultFontAsset;
+                fallbackLabel.fontSize = 40f;
+                fallbackLabel.enableAutoSizing = false;
+                fallbackLabel.alignment = TextAlignmentOptions.Center;
+                fallbackLabel.text = fallbackText;
+                fallbackLabel.color = GamePalette.ActionButtonIcon;
+                fallbackLabel.raycastTarget = false;
+            }
+
+            var badgeObject = new GameObject("Badge", typeof(RectTransform), typeof(Image));
+            badgeObject.transform.SetParent(buttonObject.transform, false);
+
+            var badgeRect = (RectTransform)badgeObject.transform;
+            badgeRect.anchorMin = new Vector2(1f, 1f);
+            badgeRect.anchorMax = new Vector2(1f, 1f);
+            badgeRect.pivot = new Vector2(0.5f, 0.5f);
+            badgeRect.sizeDelta = new Vector2(38f, 38f);
+            badgeRect.anchoredPosition = new Vector2(-14f, -10f);
+
+            var badgeImage = badgeObject.GetComponent<Image>();
+            badgeImage.sprite = GetCircleSprite();
+            badgeImage.color = GamePalette.ActionButtonBadgeBackground;
+            badgeImage.raycastTarget = false;
+
+            TMP_Text badgeLabel = CreateTextElement(badgeObject.transform, "Label");
+            RectTransform badgeLabelRect = (RectTransform)badgeLabel.transform;
+            badgeLabelRect.anchorMin = Vector2.zero;
+            badgeLabelRect.anchorMax = Vector2.one;
+            badgeLabelRect.offsetMin = Vector2.zero;
+            badgeLabelRect.offsetMax = Vector2.zero;
+            badgeLabel.font = font != null ? font : TMP_Settings.defaultFontAsset;
+            badgeLabel.fontSize = 22f;
+            badgeLabel.enableAutoSizing = false;
+            badgeLabel.alignment = TextAlignmentOptions.Center;
+            badgeLabel.color = GamePalette.ActionButtonBadgeText;
+            badgeLabel.raycastTarget = false;
+
+            return (button, buttonImage, iconImage, badgeLabel);
+        }
+
+        private static (Button Button, Image Image, TMP_Text Label) CreateTextButton(Transform parent, string name, string labelText)
         {
             var buttonObject = new GameObject(
                 name,
@@ -541,7 +714,7 @@ namespace Game.UI.Game
             label.alignment = ConvertAlignment(alignment);
             label.color = color;
             label.enableAutoSizing = false;
-            label.enableWordWrapping = true;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
             label.overflowMode = TextOverflowModes.Overflow;
         }
 
@@ -560,6 +733,59 @@ namespace Game.UI.Game
                 TextAnchor.LowerRight => TextAlignmentOptions.BottomRight,
                 _ => TextAlignmentOptions.Center,
             };
+        }
+
+        private static Sprite CreateTextureSprite(Texture2D texture)
+        {
+            if (texture == null)
+            {
+                return null;
+            }
+
+            var sprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f),
+                100f);
+
+            sprite.name = $"{texture.name}_RuntimeSprite";
+            return sprite;
+        }
+
+        private static Sprite GetCircleSprite()
+        {
+            if (_circleSprite != null)
+            {
+                return _circleSprite;
+            }
+
+            const int size = 128;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            texture.name = "UiCircleSpriteTexture";
+            texture.hideFlags = HideFlags.HideAndDontSave;
+            texture.filterMode = FilterMode.Bilinear;
+            texture.wrapMode = TextureWrapMode.Clamp;
+
+            Color[] pixels = new Color[size * size];
+            float radius = (size * 0.5f) - 1.5f;
+            Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float distance = Vector2.Distance(new Vector2(x, y), center);
+                    float alpha = Mathf.Clamp01(radius - distance);
+                    pixels[(y * size) + x] = new Color(1f, 1f, 1f, alpha);
+                }
+            }
+
+            texture.SetPixels(pixels);
+            texture.Apply(false, true);
+
+            _circleSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
+            _circleSprite.name = "UiCircleSprite";
+            return _circleSprite;
         }
     }
 }

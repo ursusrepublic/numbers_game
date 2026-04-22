@@ -24,6 +24,10 @@ namespace Game.Core.Bootstrap
         [SerializeField] private TMP_FontAsset _regularFont;
         [SerializeField] private TMP_FontAsset _boldFont;
 
+        [Header("Icons")]
+        [SerializeField] private Texture2D _plusIconTexture;
+        [SerializeField] private Texture2D _hintIconTexture;
+
         private void Awake()
         {
             if (transform.Find("GameplayRoot") != null)
@@ -43,7 +47,9 @@ namespace Game.Core.Bootstrap
                 _randomSeed,
                 _startingAdditions,
                 _regularFont,
-                _boldFont);
+                _boldFont,
+                _plusIconTexture,
+                _hintIconTexture);
         }
     }
 }
