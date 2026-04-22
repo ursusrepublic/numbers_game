@@ -10,6 +10,7 @@ namespace Game.Core.Bootstrap
     {
         [Header("App")]
         [SerializeField] private AppMode _appMode = AppMode.Player;
+        [SerializeField] private bool _showSafeAreaDebugOverlay;
 
         [Header("Board Settings")]
         [SerializeField] [Min(1)] private int _boardColumns = 9;
@@ -48,6 +49,7 @@ namespace Game.Core.Bootstrap
                 _startingAdditions,
                 _regularFont,
                 _boldFont,
+                _showSafeAreaDebugOverlay,
                 _plusIconTexture,
                 _hintIconTexture);
         }

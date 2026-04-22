@@ -52,6 +52,7 @@ namespace Game.UI.Styling
         public static readonly Color AdSlotBackground = new Color(0.9490f, 0.9333f, 0.9098f, 1f);
         public static readonly Color AdSlotBorder = new Color(0.8667f, 0.8314f, 0.7922f, 1f);
         public static readonly Color ScoreValueText = new Color(0.10f, 0.11f, 0.13f, 1f);
+        public static readonly Color SafeAreaDebugFill = new Color(0.2353f, 0.5725f, 0.9922f, 0.16f);
         
         // Buttons, like Plus, Hint
         public static readonly Color ActionButtonSurface = new Color(0.9608f, 0.7451f, 0.3098f, 1f);

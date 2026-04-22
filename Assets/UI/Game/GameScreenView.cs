@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Game.Gameplay.Board;
 using Game.UI.Ad;
+using Game.UI.Layout;
 using Game.UI.Styling;
 using TMPro;
 using UnityEngine;
@@ -13,7 +14,8 @@ namespace Game.UI.Game
     [DisallowMultipleComponent]
     public sealed class GameScreenView : MonoBehaviour
     {
-        private const float TopAreaHeight = 204f;
+        private const float TopAreaHeight = 56f;
+        private const float ScoreAreaHeight = 148f;
         private const float BottomControlsHeight = 148f;
         private const float ControlsToAdSpacing = 5f;
         private const float DefaultAdHeight = 50f;
@@ -23,15 +25,14 @@ namespace Game.UI.Game
 
         private RectTransform _boardAreaRect;
         private RectTransform _bottomControlsRect;
-        private RectTransform _gameOverOverlayRect;
         private BoardView _boardView;
         private AdSlotView _adSlotView;
+        private GameObject _overlayRoot;
         private Button _plusButton;
         private Button _hintButton;
         private Button _restartButton;
         private Image _plusButtonBackgroundImage;
         private Image _hintButtonBackgroundImage;
-        private Image _restartButtonImage;
         private Image _plusIconImage;
         private Image _hintIconImage;
         private TMP_Text _scoreValueLabel;
@@ -54,6 +55,7 @@ namespace Game.UI.Game
             int columns,
             TMP_FontAsset regularFont,
             TMP_FontAsset boldFont,
+            bool showSafeAreaDebugOverlay,
             Texture2D plusIconTexture,
             Texture2D hintIconTexture)
         {
@@ -86,8 +88,19 @@ namespace Game.UI.Game
             var backgroundImage = backgroundObject.GetComponent<Image>();
             backgroundImage.color = GamePalette.GameBackground;
 
+            if (showSafeAreaDebugOverlay)
+            {
+                SafeAreaDebugOverlayView.Create(
+                    screenObject.transform,
+                    "SafeAreaDebugOverlay",
+                    GamePalette.SafeAreaDebugFill);
+            }
+
+            SafeAreaView safeAreaView = SafeAreaView.Create(screenObject.transform, "SafeAreaContent");
+            RectTransform safeAreaRect = (RectTransform)safeAreaView.transform;
+
             var topAreaObject = new GameObject("TopArea", typeof(RectTransform));
-            topAreaObject.transform.SetParent(screenObject.transform, false);
+            topAreaObject.transform.SetParent(safeAreaRect, false);
 
             var topAreaRect = (RectTransform)topAreaObject.transform;
             topAreaRect.anchorMin = new Vector2(0f, 1f);
@@ -96,37 +109,47 @@ namespace Game.UI.Game
             topAreaRect.sizeDelta = new Vector2(0f, TopAreaHeight);
             topAreaRect.anchoredPosition = Vector2.zero;
 
-            TMP_Text scoreValueLabel = CreateTextElement(topAreaObject.transform, "ScoreValue");
+            var scoreAreaObject = new GameObject("ScoreArea", typeof(RectTransform));
+            scoreAreaObject.transform.SetParent(safeAreaRect, false);
+
+            var scoreAreaRect = (RectTransform)scoreAreaObject.transform;
+            scoreAreaRect.anchorMin = new Vector2(0f, 1f);
+            scoreAreaRect.anchorMax = new Vector2(1f, 1f);
+            scoreAreaRect.pivot = new Vector2(0.5f, 1f);
+            scoreAreaRect.sizeDelta = new Vector2(0f, ScoreAreaHeight);
+            scoreAreaRect.anchoredPosition = new Vector2(0f, -TopAreaHeight);
+
+            TMP_Text scoreValueLabel = CreateTextElement(scoreAreaObject.transform, "ScoreValue");
             ConfigureRect(
                 (RectTransform)scoreValueLabel.transform,
-                new Vector2(0.5f, 1f),
-                new Vector2(0.5f, 1f),
-                new Vector2(0.5f, 1f),
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
                 new Vector2(260f, 84f),
-                new Vector2(0f, -84f));
+                new Vector2(0f, 10f));
 
-            TMP_Text tooltipLabel = CreateTextElement(topAreaObject.transform, "TooltipLabel");
+            TMP_Text tooltipLabel = CreateTextElement(scoreAreaObject.transform, "TooltipLabel");
             ConfigureRect(
                 (RectTransform)tooltipLabel.transform,
-                new Vector2(0.5f, 1f),
-                new Vector2(0.5f, 1f),
-                new Vector2(0.5f, 1f),
+                new Vector2(0.5f, 0f),
+                new Vector2(0.5f, 0f),
+                new Vector2(0.5f, 0f),
                 new Vector2(760f, 48f),
-                new Vector2(0f, -158f));
+                new Vector2(0f, 8f));
 
             var boardAreaObject = new GameObject("BoardArea", typeof(RectTransform));
-            boardAreaObject.transform.SetParent(screenObject.transform, false);
+            boardAreaObject.transform.SetParent(safeAreaRect, false);
 
             var boardAreaRect = (RectTransform)boardAreaObject.transform;
             boardAreaRect.anchorMin = Vector2.zero;
             boardAreaRect.anchorMax = Vector2.one;
             boardAreaRect.offsetMin = new Vector2(0f, DefaultAdHeight + ControlsToAdSpacing + BottomControlsHeight);
-            boardAreaRect.offsetMax = new Vector2(0f, -TopAreaHeight);
+            boardAreaRect.offsetMax = new Vector2(0f, -(TopAreaHeight + ScoreAreaHeight));
 
             BoardView boardView = BoardView.Create(boardAreaObject.transform, columns, regularFont, boldFont);
 
             var bottomControlsObject = new GameObject("BottomControls", typeof(RectTransform));
-            bottomControlsObject.transform.SetParent(screenObject.transform, false);
+            bottomControlsObject.transform.SetParent(safeAreaRect, false);
 
             var bottomControlsRect = (RectTransform)bottomControlsObject.transform;
             bottomControlsRect.anchorMin = new Vector2(0f, 0f);
@@ -167,19 +190,28 @@ namespace Game.UI.Game
             (Button hintButton, Image hintButtonBackgroundImage, Image hintIconImage, TMP_Text hintBadgeLabel) =
                 CreateActionButton(controlsRowObject.transform, "HintButton", hintIconSprite, "?", regularFont);
 
-            AdSlotView adSlotView = AdSlotView.Create(screenObject.transform, regularFont);
+            AdSlotView adSlotView = AdSlotView.Create(safeAreaRect, regularFont);
+
+            var overlayRootObject = new GameObject("OverlayRoot", typeof(RectTransform));
+            overlayRootObject.transform.SetParent(screenObject.transform, false);
+
+            var overlayRootRect = (RectTransform)overlayRootObject.transform;
+            overlayRootRect.anchorMin = Vector2.zero;
+            overlayRootRect.anchorMax = Vector2.one;
+            overlayRootRect.offsetMin = Vector2.zero;
+            overlayRootRect.offsetMax = Vector2.zero;
 
             var overlayObject = new GameObject(
                 "GameOverOverlay",
                 typeof(RectTransform),
                 typeof(Image));
 
-            overlayObject.transform.SetParent(screenObject.transform, false);
+            overlayObject.transform.SetParent(overlayRootObject.transform, false);
 
             var overlayRect = (RectTransform)overlayObject.transform;
             overlayRect.anchorMin = Vector2.zero;
             overlayRect.anchorMax = Vector2.one;
-            overlayRect.offsetMin = new Vector2(0f, DefaultAdHeight);
+            overlayRect.offsetMin = Vector2.zero;
             overlayRect.offsetMax = Vector2.zero;
 
             var overlayImage = overlayObject.GetComponent<Image>();
@@ -212,7 +244,7 @@ namespace Game.UI.Game
             TMP_Text gameOverStageLabel = CreateTextElement(panelObject.transform, "StageLabel");
             ConfigureRect((RectTransform)gameOverStageLabel.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(520f, 56f), new Vector2(0f, -230f));
 
-            (Button restartButton, Image restartButtonImage, TMP_Text restartButtonLabel) =
+            (Button restartButton, TMP_Text restartButtonLabel) =
                 CreateTextButton(panelObject.transform, "RestartButton", "Restart");
 
             ConfigureRect((RectTransform)restartButton.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(260f, 64f), new Vector2(0f, 54f));
@@ -221,9 +253,9 @@ namespace Game.UI.Game
             screenView.Setup(
                 boardAreaRect,
                 bottomControlsRect,
-                overlayRect,
                 boardView,
                 adSlotView,
+                overlayRootObject,
                 scoreValueLabel,
                 tooltipLabel,
                 plusButton,
@@ -238,7 +270,6 @@ namespace Game.UI.Game
                 gameOverScoreLabel,
                 gameOverStageLabel,
                 restartButton,
-                restartButtonImage,
                 restartButtonLabel,
                 titleLabel,
                 regularFont,
@@ -378,7 +409,7 @@ namespace Game.UI.Game
             _gameOverScoreLabel.text = $"Final Score: {finalScore}";
             _gameOverStageLabel.text = $"Final Stage: {finalStage}";
             _gameOverOverlay.SetActive(true);
-            _gameOverOverlay.transform.SetAsLastSibling();
+            _overlayRoot?.transform.SetAsLastSibling();
         }
 
         public void HideGameOver()
@@ -420,9 +451,9 @@ namespace Game.UI.Game
         private void Setup(
             RectTransform boardAreaRect,
             RectTransform bottomControlsRect,
-            RectTransform gameOverOverlayRect,
             BoardView boardView,
             AdSlotView adSlotView,
+            GameObject overlayRoot,
             TMP_Text scoreValueLabel,
             TMP_Text tooltipLabel,
             Button plusButton,
@@ -437,7 +468,6 @@ namespace Game.UI.Game
             TMP_Text gameOverScoreLabel,
             TMP_Text gameOverStageLabel,
             Button restartButton,
-            Image restartButtonImage,
             TMP_Text restartButtonLabel,
             TMP_Text gameOverTitleLabel,
             TMP_FontAsset regularFont,
@@ -451,9 +481,9 @@ namespace Game.UI.Game
 
             _boardAreaRect = boardAreaRect;
             _bottomControlsRect = bottomControlsRect;
-            _gameOverOverlayRect = gameOverOverlayRect;
             _boardView = boardView;
             _adSlotView = adSlotView;
+            _overlayRoot = overlayRoot;
             _scoreValueLabel = scoreValueLabel;
             _tooltipLabel = tooltipLabel;
             _plusButton = plusButton;
@@ -468,7 +498,6 @@ namespace Game.UI.Game
             _gameOverScoreLabel = gameOverScoreLabel;
             _gameOverStageLabel = gameOverStageLabel;
             _restartButton = restartButton;
-            _restartButtonImage = restartButtonImage;
             _restartButtonLabel = restartButtonLabel;
 
             ConfigureLabel(_scoreValueLabel, effectiveRegularFont, 62, TextAnchor.MiddleCenter, GamePalette.ScoreValueText);
@@ -529,18 +558,12 @@ namespace Game.UI.Game
             if (_boardAreaRect != null)
             {
                 _boardAreaRect.offsetMin = new Vector2(0f, adHeight + ControlsToAdSpacing + BottomControlsHeight);
-                _boardAreaRect.offsetMax = new Vector2(0f, -TopAreaHeight);
+                _boardAreaRect.offsetMax = new Vector2(0f, -(TopAreaHeight + ScoreAreaHeight));
             }
 
             if (_bottomControlsRect != null)
             {
                 _bottomControlsRect.anchoredPosition = new Vector2(0f, adHeight + ControlsToAdSpacing);
-            }
-
-            if (_gameOverOverlayRect != null)
-            {
-                _gameOverOverlayRect.offsetMin = new Vector2(0f, adHeight);
-                _gameOverOverlayRect.offsetMax = Vector2.zero;
             }
         }
 
@@ -663,7 +686,7 @@ namespace Game.UI.Game
             return (button, buttonImage, iconImage, badgeLabel);
         }
 
-        private static (Button Button, Image Image, TMP_Text Label) CreateTextButton(Transform parent, string name, string labelText)
+        private static (Button Button, TMP_Text Label) CreateTextButton(Transform parent, string name, string labelText)
         {
             var buttonObject = new GameObject(
                 name,
@@ -689,7 +712,7 @@ namespace Game.UI.Game
             label.text = labelText;
             label.raycastTarget = false;
 
-            return (button, buttonImage, label);
+            return (button, label);
         }
 
         private static void ConfigureRect(

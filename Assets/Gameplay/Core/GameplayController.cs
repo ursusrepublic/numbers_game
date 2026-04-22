@@ -39,6 +39,7 @@ namespace Game.Gameplay.Core
         private GameSessionState _sessionState;
         private TMP_FontAsset _regularFont;
         private TMP_FontAsset _boldFont;
+        private bool _showSafeAreaDebugOverlay;
         private Texture2D _plusIconTexture;
         private Texture2D _hintIconTexture;
 
@@ -51,6 +52,7 @@ namespace Game.Gameplay.Core
             int startingAdditions,
             TMP_FontAsset regularFont,
             TMP_FontAsset boldFont,
+            bool showSafeAreaDebugOverlay,
             Texture2D plusIconTexture,
             Texture2D hintIconTexture)
         {
@@ -72,6 +74,7 @@ namespace Game.Gameplay.Core
             _remainingAdditions = _startingAdditions;
             _regularFont = regularFont != null ? regularFont : boldFont != null ? boldFont : TMP_Settings.defaultFontAsset;
             _boldFont = boldFont != null ? boldFont : _regularFont;
+            _showSafeAreaDebugOverlay = showSafeAreaDebugOverlay;
             _plusIconTexture = plusIconTexture;
             _hintIconTexture = hintIconTexture;
 
@@ -83,6 +86,7 @@ namespace Game.Gameplay.Core
                 _columns,
                 _regularFont,
                 _boldFont,
+                _appMode == AppMode.Developer && _showSafeAreaDebugOverlay,
                 _plusIconTexture,
                 _hintIconTexture);
             _gameScreenView.TileClicked += OnTileClicked;
