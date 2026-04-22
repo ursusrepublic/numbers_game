@@ -6,6 +6,7 @@ using Game.Gameplay.Dev;
 using Game.Gameplay.Score;
 using Game.Gameplay.Stage;
 using Game.UI.Game;
+using Game.UI.Layout;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -78,6 +79,7 @@ namespace Game.Gameplay.Core
             _plusIconTexture = plusIconTexture;
             _hintIconTexture = hintIconTexture;
 
+            ApplyPortraitOrientation();
             EnsureEventSystem();
 
             Transform canvasTransform = CreateCanvas();
@@ -591,12 +593,18 @@ namespace Game.Gameplay.Core
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
 
             var scaler = canvasObject.GetComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1080f, 1920f);
-            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            scaler.matchWidthOrHeight = 0.5f;
+            MobileLayout.ConfigureCanvasScaler(scaler);
 
             return canvasObject.transform;
+        }
+
+        private static void ApplyPortraitOrientation()
+        {
+            Screen.autorotateToPortrait = true;
+            Screen.autorotateToPortraitUpsideDown = false;
+            Screen.autorotateToLandscapeLeft = false;
+            Screen.autorotateToLandscapeRight = false;
+            Screen.orientation = ScreenOrientation.Portrait;
         }
 
         private void EnsureEventSystem()

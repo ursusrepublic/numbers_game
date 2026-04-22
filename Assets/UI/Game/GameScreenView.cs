@@ -15,16 +15,61 @@ namespace Game.UI.Game
     public sealed class GameScreenView : MonoBehaviour
     {
         private const float TopAreaHeight = 56f;
+        private const float MinTopAreaHeight = 40f;
+        private const float MaxTopAreaHeight = 72f;
         private const float ScoreAreaHeight = 148f;
+        private const float MinScoreAreaHeight = 112f;
+        private const float MaxScoreAreaHeight = 176f;
         private const float BottomControlsHeight = 148f;
+        private const float MinBottomControlsHeight = 112f;
+        private const float MaxBottomControlsHeight = 168f;
         private const float ControlsToAdSpacing = 5f;
+        private const float MaxControlsToAdSpacing = 10f;
         private const float DefaultAdHeight = 50f;
         private const int DefaultHintBadgeValue = 9;
+        private const float BoardSidePadding = 16f;
+        private const float MinBoardSidePadding = 12f;
+        private const float MaxBoardSidePadding = 28f;
+        private const float MaxBoardWidth = 980f;
+        private const float BoardHeightRatio = 1.16f;
+        private const float MinBoardHeight = 360f;
+        private const float ControlsRowSpacing = 44f;
+        private const float MinControlsRowSpacing = 24f;
+        private const float MaxControlsRowSpacing = 56f;
+        private const float ButtonSize = 118f;
+        private const float MinButtonSize = 92f;
+        private const float MaxButtonSize = 132f;
+        private const float IconSize = 56f;
+        private const float MinIconSize = 40f;
+        private const float MaxIconSize = 62f;
+        private const float BadgeSize = 38f;
+        private const float MinBadgeSize = 30f;
+        private const float MaxBadgeSize = 42f;
+        private const float ScoreFontSize = 62f;
+        private const float MinScoreFontSize = 44f;
+        private const float MaxScoreFontSize = 72f;
+        private const float TooltipFontSize = 24f;
+        private const float MinTooltipFontSize = 18f;
+        private const float MaxTooltipFontSize = 28f;
+        private const float RestartPanelWidth = 700f;
+        private const float RestartPanelHeight = 480f;
 
         private static Sprite _circleSprite;
 
+        private RectTransform _safeAreaRect;
+        private RectTransform _topAreaRect;
+        private RectTransform _scoreAreaRect;
+        private RectTransform _scoreValueRect;
+        private RectTransform _tooltipRect;
         private RectTransform _boardAreaRect;
+        private RectTransform _boardContainerRect;
         private RectTransform _bottomControlsRect;
+        private RectTransform _controlsRowRect;
+        private RectTransform _plusIconRect;
+        private RectTransform _hintIconRect;
+        private RectTransform _plusBadgeRect;
+        private RectTransform _hintBadgeRect;
+        private RectTransform _gameOverPanelRect;
         private BoardView _boardView;
         private AdSlotView _adSlotView;
         private GameObject _overlayRoot;
@@ -39,11 +84,17 @@ namespace Game.UI.Game
         private TMP_Text _tooltipLabel;
         private TMP_Text _plusBadgeLabel;
         private TMP_Text _hintBadgeLabel;
+        private HorizontalLayoutGroup _controlsLayout;
+        private LayoutElement _plusButtonLayoutElement;
+        private LayoutElement _hintButtonLayoutElement;
         private GameObject _gameOverOverlay;
         private TMP_Text _gameOverScoreLabel;
         private TMP_Text _gameOverStageLabel;
+        private TMP_Text _gameOverTitleLabel;
         private TMP_Text _restartButtonLabel;
         private Coroutine _tooltipRoutine;
+        private Vector2 _lastSafeAreaSize = new Vector2(-1f, -1f);
+        private float _lastAdHeight = -1f;
 
         public event Action<int> TileClicked;
         public event Action PlusClicked;
@@ -146,7 +197,17 @@ namespace Game.UI.Game
             boardAreaRect.offsetMin = new Vector2(0f, DefaultAdHeight + ControlsToAdSpacing + BottomControlsHeight);
             boardAreaRect.offsetMax = new Vector2(0f, -(TopAreaHeight + ScoreAreaHeight));
 
-            BoardView boardView = BoardView.Create(boardAreaObject.transform, columns, regularFont, boldFont);
+            var boardContainerObject = new GameObject("BoardContainer", typeof(RectTransform));
+            boardContainerObject.transform.SetParent(boardAreaObject.transform, false);
+
+            var boardContainerRect = (RectTransform)boardContainerObject.transform;
+            boardContainerRect.anchorMin = new Vector2(0.5f, 0.5f);
+            boardContainerRect.anchorMax = new Vector2(0.5f, 0.5f);
+            boardContainerRect.pivot = new Vector2(0.5f, 0.5f);
+            boardContainerRect.sizeDelta = new Vector2(MaxBoardWidth, MaxBoardWidth * BoardHeightRatio);
+            boardContainerRect.anchoredPosition = Vector2.zero;
+
+            BoardView boardView = BoardView.Create(boardContainerObject.transform, columns, regularFont, boldFont);
 
             var bottomControlsObject = new GameObject("BottomControls", typeof(RectTransform));
             bottomControlsObject.transform.SetParent(safeAreaRect, false);
@@ -174,7 +235,7 @@ namespace Game.UI.Game
 
             var controlsLayout = controlsRowObject.GetComponent<HorizontalLayoutGroup>();
             controlsLayout.childAlignment = TextAnchor.MiddleCenter;
-            controlsLayout.spacing = 44f;
+            controlsLayout.spacing = ControlsRowSpacing;
             controlsLayout.padding = new RectOffset(0, 0, 0, 0);
             controlsLayout.childForceExpandHeight = false;
             controlsLayout.childForceExpandWidth = false;
@@ -184,10 +245,10 @@ namespace Game.UI.Game
             Sprite plusIconSprite = CreateTextureSprite(plusIconTexture);
             Sprite hintIconSprite = CreateTextureSprite(hintIconTexture);
 
-            (Button plusButton, Image plusButtonBackgroundImage, Image plusIconImage, TMP_Text plusBadgeLabel) =
+            (Button plusButton, Image plusButtonBackgroundImage, Image plusIconImage, TMP_Text plusBadgeLabel, LayoutElement plusButtonLayoutElement, RectTransform plusIconRect, RectTransform plusBadgeRect) =
                 CreateActionButton(controlsRowObject.transform, "PlusButton", plusIconSprite, "+", regularFont);
 
-            (Button hintButton, Image hintButtonBackgroundImage, Image hintIconImage, TMP_Text hintBadgeLabel) =
+            (Button hintButton, Image hintButtonBackgroundImage, Image hintIconImage, TMP_Text hintBadgeLabel, LayoutElement hintButtonLayoutElement, RectTransform hintIconRect, RectTransform hintBadgeRect) =
                 CreateActionButton(controlsRowObject.transform, "HintButton", hintIconSprite, "?", regularFont);
 
             AdSlotView adSlotView = AdSlotView.Create(safeAreaRect, regularFont);
@@ -251,8 +312,16 @@ namespace Game.UI.Game
 
             var screenView = screenObject.GetComponent<GameScreenView>();
             screenView.Setup(
+                safeAreaRect,
+                topAreaRect,
+                scoreAreaRect,
+                (RectTransform)scoreValueLabel.transform,
+                (RectTransform)tooltipLabel.transform,
                 boardAreaRect,
+                boardContainerRect,
                 bottomControlsRect,
+                controlsRowRect,
+                controlsLayout,
                 boardView,
                 adSlotView,
                 overlayRootObject,
@@ -262,11 +331,18 @@ namespace Game.UI.Game
                 plusButtonBackgroundImage,
                 plusIconImage,
                 plusBadgeLabel,
+                plusButtonLayoutElement,
+                plusIconRect,
+                plusBadgeRect,
                 hintButton,
                 hintButtonBackgroundImage,
                 hintIconImage,
                 hintBadgeLabel,
+                hintButtonLayoutElement,
+                hintIconRect,
+                hintBadgeRect,
                 overlayObject,
+                panelRect,
                 gameOverScoreLabel,
                 gameOverStageLabel,
                 restartButton,
@@ -449,8 +525,16 @@ namespace Game.UI.Game
         }
 
         private void Setup(
+            RectTransform safeAreaRect,
+            RectTransform topAreaRect,
+            RectTransform scoreAreaRect,
+            RectTransform scoreValueRect,
+            RectTransform tooltipRect,
             RectTransform boardAreaRect,
+            RectTransform boardContainerRect,
             RectTransform bottomControlsRect,
+            RectTransform controlsRowRect,
+            HorizontalLayoutGroup controlsLayout,
             BoardView boardView,
             AdSlotView adSlotView,
             GameObject overlayRoot,
@@ -460,11 +544,18 @@ namespace Game.UI.Game
             Image plusButtonBackgroundImage,
             Image plusIconImage,
             TMP_Text plusBadgeLabel,
+            LayoutElement plusButtonLayoutElement,
+            RectTransform plusIconRect,
+            RectTransform plusBadgeRect,
             Button hintButton,
             Image hintButtonBackgroundImage,
             Image hintIconImage,
             TMP_Text hintBadgeLabel,
+            LayoutElement hintButtonLayoutElement,
+            RectTransform hintIconRect,
+            RectTransform hintBadgeRect,
             GameObject gameOverOverlay,
+            RectTransform gameOverPanelRect,
             TMP_Text gameOverScoreLabel,
             TMP_Text gameOverStageLabel,
             Button restartButton,
@@ -480,7 +571,15 @@ namespace Game.UI.Game
                     : TMP_Settings.defaultFontAsset;
 
             _boardAreaRect = boardAreaRect;
+            _safeAreaRect = safeAreaRect;
+            _topAreaRect = topAreaRect;
+            _scoreAreaRect = scoreAreaRect;
+            _scoreValueRect = scoreValueRect;
+            _tooltipRect = tooltipRect;
+            _boardContainerRect = boardContainerRect;
             _bottomControlsRect = bottomControlsRect;
+            _controlsRowRect = controlsRowRect;
+            _controlsLayout = controlsLayout;
             _boardView = boardView;
             _adSlotView = adSlotView;
             _overlayRoot = overlayRoot;
@@ -490,13 +589,21 @@ namespace Game.UI.Game
             _plusButtonBackgroundImage = plusButtonBackgroundImage;
             _plusIconImage = plusIconImage;
             _plusBadgeLabel = plusBadgeLabel;
+            _plusButtonLayoutElement = plusButtonLayoutElement;
+            _plusIconRect = plusIconRect;
+            _plusBadgeRect = plusBadgeRect;
             _hintButton = hintButton;
             _hintButtonBackgroundImage = hintButtonBackgroundImage;
             _hintIconImage = hintIconImage;
             _hintBadgeLabel = hintBadgeLabel;
+            _hintButtonLayoutElement = hintButtonLayoutElement;
+            _hintIconRect = hintIconRect;
+            _hintBadgeRect = hintBadgeRect;
             _gameOverOverlay = gameOverOverlay;
+            _gameOverPanelRect = gameOverPanelRect;
             _gameOverScoreLabel = gameOverScoreLabel;
             _gameOverStageLabel = gameOverStageLabel;
+            _gameOverTitleLabel = gameOverTitleLabel;
             _restartButton = restartButton;
             _restartButtonLabel = restartButtonLabel;
 
@@ -525,7 +632,7 @@ namespace Game.UI.Game
             SetPlusButtonInteractable(true);
             SetHintButtonLocked(false);
             HideGameOver();
-            ApplyAdInsets(_adSlotView != null ? _adSlotView.CurrentHeight : DefaultAdHeight);
+            ApplyResponsiveLayout(force: true);
         }
 
         private void HandleBoardTileClicked(int index)
@@ -550,20 +657,195 @@ namespace Game.UI.Game
 
         private void HandleAdSlotHeightChanged(float adHeight)
         {
-            ApplyAdInsets(adHeight);
+            ApplyResponsiveLayout(force: true);
         }
 
-        private void ApplyAdInsets(float adHeight)
+        private void OnEnable()
         {
+            ApplyResponsiveLayout(force: true);
+        }
+
+        private void LateUpdate()
+        {
+            ApplyResponsiveLayout(force: false);
+        }
+
+        private void ApplyResponsiveLayout(bool force)
+        {
+            if (_safeAreaRect == null)
+            {
+                return;
+            }
+
+            Rect safeAreaRect = _safeAreaRect.rect;
+            float safeWidth = safeAreaRect.width;
+            float safeHeight = safeAreaRect.height;
+            if (safeWidth <= 0f || safeHeight <= 0f)
+            {
+                return;
+            }
+
+            float adHeight = _adSlotView != null ? _adSlotView.CurrentHeight : DefaultAdHeight;
+            Vector2 safeAreaSize = new Vector2(safeWidth, safeHeight);
+
+            if (!force &&
+                Vector2.Distance(_lastSafeAreaSize, safeAreaSize) < 0.5f &&
+                Mathf.Abs(_lastAdHeight - adHeight) < 0.5f)
+            {
+                return;
+            }
+
+            _lastSafeAreaSize = safeAreaSize;
+            _lastAdHeight = adHeight;
+
+            float scale = MobileLayout.GetScale(safeWidth, safeHeight);
+            float topAreaHeight = MobileLayout.ClampScaled(TopAreaHeight, MinTopAreaHeight, MaxTopAreaHeight, scale);
+            float scoreAreaHeight = MobileLayout.ClampScaled(ScoreAreaHeight, MinScoreAreaHeight, MaxScoreAreaHeight, scale);
+            float bottomControlsHeight = MobileLayout.ClampScaled(BottomControlsHeight, MinBottomControlsHeight, MaxBottomControlsHeight, scale);
+            float controlsToAdSpacing = MobileLayout.ClampScaled(ControlsToAdSpacing, ControlsToAdSpacing, MaxControlsToAdSpacing, scale);
+            float boardSidePadding = MobileLayout.ClampScaled(BoardSidePadding, MinBoardSidePadding, MaxBoardSidePadding, scale);
+            float buttonSize = MobileLayout.ClampScaled(ButtonSize, MinButtonSize, MaxButtonSize, scale);
+            float iconSize = MobileLayout.ClampScaled(IconSize, MinIconSize, MaxIconSize, scale);
+            float badgeSize = MobileLayout.ClampScaled(BadgeSize, MinBadgeSize, MaxBadgeSize, scale);
+            float controlsSpacing = MobileLayout.ClampScaled(ControlsRowSpacing, MinControlsRowSpacing, MaxControlsRowSpacing, scale);
+            float scoreFontSize = MobileLayout.ClampScaled(ScoreFontSize, MinScoreFontSize, MaxScoreFontSize, scale);
+            float tooltipFontSize = MobileLayout.ClampScaled(TooltipFontSize, MinTooltipFontSize, MaxTooltipFontSize, scale);
+
+            if (_topAreaRect != null)
+            {
+                _topAreaRect.sizeDelta = new Vector2(0f, topAreaHeight);
+            }
+
+            if (_scoreAreaRect != null)
+            {
+                _scoreAreaRect.sizeDelta = new Vector2(0f, scoreAreaHeight);
+                _scoreAreaRect.anchoredPosition = new Vector2(0f, -topAreaHeight);
+            }
+
+            if (_scoreValueRect != null)
+            {
+                _scoreValueRect.sizeDelta = new Vector2(Mathf.Min(safeWidth - (boardSidePadding * 2f), 420f), MobileLayout.ClampScaled(84f, 64f, 96f, scale));
+                _scoreValueRect.anchoredPosition = new Vector2(0f, MobileLayout.ClampScaled(10f, 0f, 14f, scale));
+            }
+
+            if (_tooltipRect != null)
+            {
+                _tooltipRect.sizeDelta = new Vector2(Mathf.Max(240f, safeWidth - (boardSidePadding * 2f)), MobileLayout.ClampScaled(48f, 36f, 56f, scale));
+                _tooltipRect.anchoredPosition = new Vector2(0f, MobileLayout.ClampScaled(8f, 6f, 12f, scale));
+            }
+
+            if (_scoreValueLabel != null)
+            {
+                _scoreValueLabel.fontSize = scoreFontSize;
+            }
+
+            if (_tooltipLabel != null)
+            {
+                _tooltipLabel.fontSize = tooltipFontSize;
+            }
+
             if (_boardAreaRect != null)
             {
-                _boardAreaRect.offsetMin = new Vector2(0f, adHeight + ControlsToAdSpacing + BottomControlsHeight);
-                _boardAreaRect.offsetMax = new Vector2(0f, -(TopAreaHeight + ScoreAreaHeight));
+                _boardAreaRect.offsetMin = new Vector2(0f, adHeight + controlsToAdSpacing + bottomControlsHeight);
+                _boardAreaRect.offsetMax = new Vector2(0f, -(topAreaHeight + scoreAreaHeight));
             }
 
             if (_bottomControlsRect != null)
             {
-                _bottomControlsRect.anchoredPosition = new Vector2(0f, adHeight + ControlsToAdSpacing);
+                _bottomControlsRect.sizeDelta = new Vector2(0f, bottomControlsHeight);
+                _bottomControlsRect.anchoredPosition = new Vector2(0f, adHeight + controlsToAdSpacing);
+            }
+
+            if (_controlsRowRect != null)
+            {
+                _controlsRowRect.sizeDelta = new Vector2((buttonSize * 2f) + controlsSpacing, buttonSize + badgeSize);
+                _controlsRowRect.anchoredPosition = new Vector2(0f, MobileLayout.ClampScaled(6f, 0f, 10f, scale));
+            }
+
+            if (_controlsLayout != null)
+            {
+                _controlsLayout.spacing = controlsSpacing;
+            }
+
+            ApplyActionButtonMetrics(_plusButtonLayoutElement, _plusIconRect, _plusBadgeRect, buttonSize, iconSize, badgeSize, scale);
+            ApplyActionButtonMetrics(_hintButtonLayoutElement, _hintIconRect, _hintBadgeRect, buttonSize, iconSize, badgeSize, scale);
+
+            if (_plusBadgeLabel != null)
+            {
+                _plusBadgeLabel.fontSize = MobileLayout.ClampScaled(22f, 18f, 24f, scale);
+            }
+
+            if (_hintBadgeLabel != null)
+            {
+                _hintBadgeLabel.fontSize = MobileLayout.ClampScaled(22f, 18f, 24f, scale);
+            }
+
+            if (_boardContainerRect != null && _boardAreaRect != null)
+            {
+                float availableBoardWidth = Mathf.Max(1f, safeWidth - (boardSidePadding * 2f));
+                float boardWidth = Mathf.Min(MaxBoardWidth, availableBoardWidth);
+                float availableBoardHeight = Mathf.Max(1f, _boardAreaRect.rect.height);
+                float boardHeight = Mathf.Min(availableBoardHeight, Mathf.Max(MinBoardHeight, boardWidth * BoardHeightRatio));
+                _boardContainerRect.sizeDelta = new Vector2(boardWidth, boardHeight);
+            }
+
+            if (_gameOverPanelRect != null)
+            {
+                float panelWidth = Mathf.Min(safeWidth - (boardSidePadding * 2f), RestartPanelWidth);
+                float panelHeight = Mathf.Min(safeHeight - (boardSidePadding * 2f), RestartPanelHeight);
+                _gameOverPanelRect.sizeDelta = new Vector2(Mathf.Max(320f, panelWidth), Mathf.Max(320f, panelHeight));
+            }
+
+            if (_gameOverTitleLabel != null)
+            {
+                _gameOverTitleLabel.fontSize = MobileLayout.ClampScaled(48f, 36f, 52f, scale);
+            }
+
+            if (_gameOverScoreLabel != null)
+            {
+                _gameOverScoreLabel.fontSize = MobileLayout.ClampScaled(34f, 26f, 38f, scale);
+            }
+
+            if (_gameOverStageLabel != null)
+            {
+                _gameOverStageLabel.fontSize = MobileLayout.ClampScaled(34f, 26f, 38f, scale);
+            }
+
+            if (_restartButtonLabel != null)
+            {
+                _restartButtonLabel.fontSize = MobileLayout.ClampScaled(34f, 26f, 38f, scale);
+            }
+        }
+
+        private static void ApplyActionButtonMetrics(
+            LayoutElement layoutElement,
+            RectTransform iconRect,
+            RectTransform badgeRect,
+            float buttonSize,
+            float iconSize,
+            float badgeSize,
+            float scale)
+        {
+            if (layoutElement != null)
+            {
+                layoutElement.preferredWidth = buttonSize;
+                layoutElement.preferredHeight = buttonSize;
+                layoutElement.minWidth = buttonSize;
+                layoutElement.minHeight = buttonSize;
+            }
+
+            if (iconRect != null)
+            {
+                iconRect.sizeDelta = new Vector2(iconSize, iconSize);
+                iconRect.anchoredPosition = new Vector2(0f, MobileLayout.ClampScaled(-2f, -4f, 0f, scale));
+            }
+
+            if (badgeRect != null)
+            {
+                badgeRect.sizeDelta = new Vector2(badgeSize, badgeSize);
+                badgeRect.anchoredPosition = new Vector2(
+                    MobileLayout.ClampScaled(-14f, -16f, -10f, scale),
+                    MobileLayout.ClampScaled(-10f, -12f, -8f, scale));
             }
         }
 
@@ -591,7 +873,7 @@ namespace Game.UI.Game
             return textObject.GetComponent<TextMeshProUGUI>();
         }
 
-        private static (Button Button, Image BackgroundImage, Image IconImage, TMP_Text BadgeLabel) CreateActionButton(
+        private static (Button Button, Image BackgroundImage, Image IconImage, TMP_Text BadgeLabel, LayoutElement LayoutElement, RectTransform IconRect, RectTransform BadgeRect) CreateActionButton(
             Transform parent,
             string name,
             Sprite iconSprite,
@@ -683,7 +965,7 @@ namespace Game.UI.Game
             badgeLabel.color = GamePalette.ActionButtonBadgeText;
             badgeLabel.raycastTarget = false;
 
-            return (button, buttonImage, iconImage, badgeLabel);
+            return (button, buttonImage, iconImage, badgeLabel, layoutElement, iconRect, badgeRect);
         }
 
         private static (Button Button, TMP_Text Label) CreateTextButton(Transform parent, string name, string labelText)
