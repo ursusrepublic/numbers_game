@@ -61,6 +61,10 @@ namespace Game.UI.Styling
         public static readonly Color ActionButtonIconDisabled = new Color(0.60f, 0.66f, 0.73f, 1f);
         public static readonly Color ActionButtonBadgeBackground = new Color(0.9882f, 0.8157f, 0.4588f, 1f);
         public static readonly Color ActionButtonBadgeText = new Color(0.2980f, 0.2549f, 0.1843f, 1f);
+        public static readonly Color TabBarBackground = new Color(0.9804f, 0.9647f, 0.9412f, 0.98f);
+        public static readonly Color TabBarBorder = new Color(0.8667f, 0.8314f, 0.7922f, 1f);
+        public static readonly Color TabBarActive = new Color(0.2275f, 0.5529f, 0.8706f, 1f);
+        public static readonly Color TabBarInactive = new Color(0.5059f, 0.5137f, 0.5451f, 1f);
 
         public static readonly Color GameOverOverlay = new Color(0.05f, 0.06f, 0.09f, 0.84f);
 

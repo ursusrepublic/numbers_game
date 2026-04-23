@@ -1,8 +1,8 @@
 using Game.App.Save;
 using Game.Core;
 using Game.Gameplay.Core;
+using Game.UI.AppTabs;
 using Game.UI.Layout;
-using Game.UI.Lobby;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -25,11 +25,15 @@ namespace Game.App
         private bool _showSafeAreaDebugOverlay;
         private Texture2D _plusIconTexture;
         private Texture2D _hintIconTexture;
+        private Texture2D _mainTabIconTexture;
+        private Texture2D _dailyTabIconTexture;
+        private Texture2D _journeyTabIconTexture;
+        private Texture2D _meTabIconTexture;
 
         private LocalSaveService _saveService;
         private AppSaveData _appSaveData;
-        private LobbyScreenView _lobbyScreenView;
-        private Transform _lobbyCanvasTransform;
+        private AppTabsView _appTabsView;
+        private Transform _appTabsCanvasTransform;
         private GameplayController _gameplayController;
         private bool _hasUnfinishedRun;
 
@@ -44,7 +48,11 @@ namespace Game.App
             TMP_FontAsset boldFont,
             bool showSafeAreaDebugOverlay,
             Texture2D plusIconTexture,
-            Texture2D hintIconTexture)
+            Texture2D hintIconTexture,
+            Texture2D mainTabIconTexture,
+            Texture2D dailyTabIconTexture,
+            Texture2D journeyTabIconTexture,
+            Texture2D meTabIconTexture)
         {
             _appMode = appMode;
             _boardColumns = boardColumns;
@@ -57,6 +65,10 @@ namespace Game.App
             _showSafeAreaDebugOverlay = showSafeAreaDebugOverlay;
             _plusIconTexture = plusIconTexture;
             _hintIconTexture = hintIconTexture;
+            _mainTabIconTexture = mainTabIconTexture;
+            _dailyTabIconTexture = dailyTabIconTexture;
+            _journeyTabIconTexture = journeyTabIconTexture;
+            _meTabIconTexture = meTabIconTexture;
 
             ApplyPortraitOrientation();
             EnsureEventSystem();
@@ -70,7 +82,7 @@ namespace Game.App
                 _saveService.Save(_appSaveData);
             }
 
-            ShowLobby();
+            ShowAppTabs(AppTabId.Main);
         }
 
         private void OnApplicationPause(bool pauseStatus)
@@ -86,24 +98,29 @@ namespace Game.App
             SaveCurrentRunIfNeeded();
         }
 
-        private void ShowLobby()
+        private void ShowAppTabs(AppTabId selectedTab)
         {
             DestroyGameplay();
 
-            if (_lobbyScreenView == null)
+            if (_appTabsView == null)
             {
-                _lobbyCanvasTransform = CreateCanvas("LobbyCanvas");
-                _lobbyScreenView = LobbyScreenView.Create(
-                    _lobbyCanvasTransform,
+                _appTabsCanvasTransform = CreateCanvas("AppTabsCanvas");
+                _appTabsView = AppTabsView.Create(
+                    _appTabsCanvasTransform,
                     _regularFont,
                     _boldFont,
-                    _appMode == AppMode.Developer && _showSafeAreaDebugOverlay);
-                _lobbyScreenView.ContinueClicked += HandleContinueClicked;
-                _lobbyScreenView.NewGameClicked += HandleNewGameClicked;
+                    _appMode == AppMode.Developer && _showSafeAreaDebugOverlay,
+                    _mainTabIconTexture,
+                    _dailyTabIconTexture,
+                    _journeyTabIconTexture,
+                    _meTabIconTexture);
+                _appTabsView.ContinueClicked += HandleContinueClicked;
+                _appTabsView.NewGameClicked += HandleNewGameClicked;
             }
 
-            _lobbyScreenView.SetBestScore(_appSaveData.BestScore);
-            _lobbyScreenView.SetContinueVisible(HasValidActiveRun());
+            _appTabsView.SetBestScore(_appSaveData.BestScore);
+            _appTabsView.SetContinueVisible(HasValidActiveRun());
+            _appTabsView.SelectTab(selectedTab);
         }
 
         private void StartNewGame()
@@ -135,7 +152,7 @@ namespace Game.App
             {
                 _appSaveData.ActiveRun = null;
                 _saveService.Save(_appSaveData);
-                ShowLobby();
+                ShowAppTabs(AppTabId.Main);
                 return;
             }
 
@@ -155,7 +172,7 @@ namespace Game.App
 
         private void CreateGameplayController()
         {
-            DestroyLobby();
+            DestroyAppTabs();
             DestroyGameplay();
 
             var gameplayRoot = new GameObject("GameplayRoot");
@@ -185,22 +202,22 @@ namespace Game.App
             _gameplayController = null;
         }
 
-        private void DestroyLobby()
+        private void DestroyAppTabs()
         {
-            if (_lobbyScreenView != null)
+            if (_appTabsView != null)
             {
-                _lobbyScreenView.ContinueClicked -= HandleContinueClicked;
-                _lobbyScreenView.NewGameClicked -= HandleNewGameClicked;
+                _appTabsView.ContinueClicked -= HandleContinueClicked;
+                _appTabsView.NewGameClicked -= HandleNewGameClicked;
             }
 
-            if (_lobbyCanvasTransform != null)
+            if (_appTabsCanvasTransform != null)
             {
-                _lobbyCanvasTransform.gameObject.SetActive(false);
-                Destroy(_lobbyCanvasTransform.gameObject);
-                _lobbyCanvasTransform = null;
+                _appTabsCanvasTransform.gameObject.SetActive(false);
+                Destroy(_appTabsCanvasTransform.gameObject);
+                _appTabsCanvasTransform = null;
             }
 
-            _lobbyScreenView = null;
+            _appTabsView = null;
         }
 
         private void HandleContinueClicked()
@@ -216,7 +233,7 @@ namespace Game.App
         private void HandleBackToLobbyRequested()
         {
             SaveCurrentRunIfNeeded();
-            ShowLobby();
+            ShowAppTabs(AppTabId.Main);
         }
 
         private void HandleRunStateChanged()

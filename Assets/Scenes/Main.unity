@@ -380,6 +380,10 @@ MonoBehaviour:
   _boldFont: {fileID: 11400000, guid: 572baca8bc799483b8f01d62ae1a1575, type: 2}
   _plusIconTexture: {fileID: 2800000, guid: 8504a71574c01451085f2bd94eca4970, type: 3}
   _hintIconTexture: {fileID: 2800000, guid: df35d9350658f46298f6da38de59f3b4, type: 3}
+  _mainTabIconTexture: {fileID: 2800000, guid: f9204b3f34495483ca5be3c0efd941a4, type: 3}
+  _dailyTabIconTexture: {fileID: 2800000, guid: 817c9a34b1f7a4d3391eca5510efed74, type: 3}
+  _journeyTabIconTexture: {fileID: 2800000, guid: f202d00f724c248e6a8d599519bdb427, type: 3}
+  _meTabIconTexture: {fileID: 2800000, guid: aa87b3d3b05e64df29099d27b9e6c749, type: 3}
 --- !u!4 &900000002
 Transform:
   m_ObjectHideFlags: 0

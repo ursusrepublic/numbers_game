@@ -28,6 +28,10 @@ namespace Game.Core.Bootstrap
         [Header("Icons")]
         [SerializeField] private Texture2D _plusIconTexture;
         [SerializeField] private Texture2D _hintIconTexture;
+        [SerializeField] private Texture2D _mainTabIconTexture;
+        [SerializeField] private Texture2D _dailyTabIconTexture;
+        [SerializeField] private Texture2D _journeyTabIconTexture;
+        [SerializeField] private Texture2D _meTabIconTexture;
 
         private void Awake()
         {
@@ -51,7 +55,11 @@ namespace Game.Core.Bootstrap
                 _boldFont,
                 _showSafeAreaDebugOverlay,
                 _plusIconTexture,
-                _hintIconTexture);
+                _hintIconTexture,
+                _mainTabIconTexture,
+                _dailyTabIconTexture,
+                _journeyTabIconTexture,
+                _meTabIconTexture);
         }
     }
 }
