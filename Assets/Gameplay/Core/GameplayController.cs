@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Game.App.Save;
 using Game.Core;
 using Game.Gameplay.Board;
 using Game.Gameplay.Dev;
@@ -11,7 +12,6 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace Game.Gameplay.Core
@@ -19,6 +19,8 @@ namespace Game.Gameplay.Core
     [DisallowMultipleComponent]
     public sealed class GameplayController : MonoBehaviour
     {
+        private const int DefaultHintCount = 9;
+
         private BoardState _boardState;
         private GameScreenView _gameScreenView;
         private DevPanelView _devPanelView;
@@ -26,7 +28,6 @@ namespace Game.Gameplay.Core
         private BoardPairFinder _boardPairFinder;
         private ScoreService _scoreService;
         private StageState _stageState;
-        private System.Random _boardSeedRandom;
         private System.Random _runtimeRandom;
         private BoardMatchInfo _hintedPair;
         private AppMode _appMode;
@@ -37,6 +38,10 @@ namespace Game.Gameplay.Core
         private int _startingPairs;
         private int _startingAdditions;
         private int _remainingAdditions;
+        private int _startingHints;
+        private int _remainingHints;
+        private int _bestScore;
+        private int _nextBoardSeed;
         private GameSessionState _sessionState;
         private TMP_FontAsset _regularFont;
         private TMP_FontAsset _boldFont;
@@ -44,7 +49,12 @@ namespace Game.Gameplay.Core
         private Texture2D _plusIconTexture;
         private Texture2D _hintIconTexture;
 
-        public void Initialize(
+        public event Action BackToLobbyRequested;
+        public event Action RunStateChanged;
+        public event Action<int> RunCompleted;
+        public event Action RestartRequested;
+
+        public void InitializeNewRun(
             AppMode appMode,
             int columns,
             int initialRows,
@@ -55,7 +65,8 @@ namespace Game.Gameplay.Core
             TMP_FontAsset boldFont,
             bool showSafeAreaDebugOverlay,
             Texture2D plusIconTexture,
-            Texture2D hintIconTexture)
+            Texture2D hintIconTexture,
+            int bestScore)
         {
             _appMode = appMode;
             _columns = Mathf.Max(1, columns);
@@ -66,48 +77,26 @@ namespace Game.Gameplay.Core
 
             _boardMatchRules = new BoardMatchRules();
             _boardPairFinder = new BoardPairFinder(_boardMatchRules);
-            _boardSeedRandom = new System.Random(actualSeed ^ 0x51F2D4A);
             _runtimeRandom = new System.Random(actualSeed ^ 0x3F2A5C7);
-            _boardState = CreateBoardState(actualSeed);
             _scoreService = new ScoreService();
             _stageState = new StageState();
             _startingAdditions = Mathf.Max(0, startingAdditions);
             _remainingAdditions = _startingAdditions;
+            _startingHints = DefaultHintCount;
+            _remainingHints = _startingHints;
+            _bestScore = Mathf.Max(0, bestScore);
             _regularFont = regularFont != null ? regularFont : boldFont != null ? boldFont : TMP_Settings.defaultFontAsset;
             _boldFont = boldFont != null ? boldFont : _regularFont;
             _showSafeAreaDebugOverlay = showSafeAreaDebugOverlay;
             _plusIconTexture = plusIconTexture;
             _hintIconTexture = hintIconTexture;
+            _selectedCellIndex = null;
+            _hintedPair = null;
+            _sessionState = default;
+            _nextBoardSeed = DeriveNextBoardSeed(actualSeed);
+            _boardState = CreateBoardState(actualSeed);
 
-            ApplyPortraitOrientation();
-            EnsureEventSystem();
-
-            Transform canvasTransform = CreateCanvas();
-            _gameScreenView = GameScreenView.Create(
-                canvasTransform,
-                _columns,
-                _regularFont,
-                _boldFont,
-                _appMode == AppMode.Developer && _showSafeAreaDebugOverlay,
-                _plusIconTexture,
-                _hintIconTexture);
-            _gameScreenView.TileClicked += OnTileClicked;
-            _gameScreenView.PlusClicked += OnPlusClicked;
-            _gameScreenView.HintClicked += OnHintClicked;
-            _gameScreenView.RestartClicked += OnRestartClicked;
-            _gameScreenView.SetCells(_boardState.Cells);
-            _gameScreenView.ScrollToTop();
-            _gameScreenView.SetScore(_scoreService.TotalScore);
-            UpdateAdditionsUi();
-            _gameScreenView.SetHintButtonLocked(false);
-            _gameScreenView.HideGameOver();
-
-            if (_appMode == AppMode.Developer)
-            {
-                _devPanelView = DevPanelView.Create(canvasTransform, _regularFont);
-                _devPanelView.ShowPairsClicked += OnShowDeveloperPairsClicked;
-                _devPanelView.SolveOnePairClicked += OnSolveOnePairClicked;
-            }
+            InitializeViews();
 
             Debug.Log(
                 $"GameplayController: Generated a scrollable board with {_boardState.Cells.Count} cells, " +
@@ -124,10 +113,61 @@ namespace Game.Gameplay.Core
             UpdateDeveloperInfo();
         }
 
+        public void InitializeFromSave(
+            AppMode appMode,
+            RunSaveData runSave,
+            TMP_FontAsset regularFont,
+            TMP_FontAsset boldFont,
+            bool showSafeAreaDebugOverlay,
+            Texture2D plusIconTexture,
+            Texture2D hintIconTexture,
+            int bestScore)
+        {
+            _appMode = appMode;
+            _columns = Mathf.Max(1, runSave.Columns);
+            _initialRows = Mathf.Max(1, runSave.InitialRows);
+            _startingPairs = Mathf.Max(0, runSave.StartingPairs);
+            _startingAdditions = Mathf.Max(0, runSave.StartingAdditions);
+            _remainingAdditions = Mathf.Max(0, runSave.RemainingAdditions);
+            _startingHints = Mathf.Max(0, runSave.StartingHints);
+            _remainingHints = Mathf.Max(0, runSave.RemainingHints);
+            _currentBoardSeed = runSave.CurrentBoardSeed;
+            _nextBoardSeed = runSave.NextBoardSeed;
+            _bestScore = Mathf.Max(0, bestScore);
+            _regularFont = regularFont != null ? regularFont : boldFont != null ? boldFont : TMP_Settings.defaultFontAsset;
+            _boldFont = boldFont != null ? boldFont : _regularFont;
+            _showSafeAreaDebugOverlay = showSafeAreaDebugOverlay;
+            _plusIconTexture = plusIconTexture;
+            _hintIconTexture = hintIconTexture;
+            _boardMatchRules = new BoardMatchRules();
+            _boardPairFinder = new BoardPairFinder(_boardMatchRules);
+            _runtimeRandom = new System.Random(runSave.CurrentBoardSeed ^ 0x3F2A5C7);
+            _scoreService = new ScoreService();
+            _scoreService.Restore(runSave.CurrentScore);
+            _stageState = new StageState();
+            _stageState.Restore(runSave.ClearedBoardCount);
+            _boardState = CreateBoardStateFromSave(runSave);
+            int selectedIndex = FindSelectedCellIndex(_boardState.Cells);
+            _selectedCellIndex = selectedIndex >= 0 ? selectedIndex : null;
+            _hintedPair = TryRestoreHintedPair(runSave);
+            _sessionState = default;
+
+            InitializeViews();
+
+            Debug.Log(
+                $"GameplayController: Restored run with {_boardState.Cells.Count} cells, " +
+                $"score {_scoreService.TotalScore}, stage {_stageState.Stage}, " +
+                $"additions {_remainingAdditions} and seed {_currentBoardSeed}. Mode {_appMode}.");
+
+            EvaluateSessionState(showNoMovesTooltip: false);
+            UpdateDeveloperInfo();
+        }
+
         private void OnDestroy()
         {
             if (_gameScreenView != null)
             {
+                _gameScreenView.BackClicked -= OnBackClicked;
                 _gameScreenView.TileClicked -= OnTileClicked;
                 _gameScreenView.PlusClicked -= OnPlusClicked;
                 _gameScreenView.HintClicked -= OnHintClicked;
@@ -138,6 +178,156 @@ namespace Game.Gameplay.Core
             {
                 _devPanelView.ShowPairsClicked -= OnShowDeveloperPairsClicked;
                 _devPanelView.SolveOnePairClicked -= OnSolveOnePairClicked;
+            }
+        }
+
+        public RunSaveData CreateRunSaveData()
+        {
+            var cells = _boardState?.Cells;
+            var cellSaves = cells != null ? new CellSaveData[cells.Count] : Array.Empty<CellSaveData>();
+
+            if (cells != null)
+            {
+                for (int index = 0; index < cells.Count; index++)
+                {
+                    BoardCell cell = cells[index];
+                    cellSaves[index] = new CellSaveData
+                    {
+                        Number = cell.Number,
+                        IsMatched = cell.IsMatched,
+                        IsSelected = cell.IsSelected,
+                    };
+                }
+            }
+
+            return new RunSaveData
+            {
+                Columns = _columns,
+                InitialRows = _initialRows,
+                StartingPairs = _startingPairs,
+                StartingAdditions = _startingAdditions,
+                StartingHints = _startingHints,
+                CurrentScore = _scoreService != null ? _scoreService.TotalScore : 0,
+                ClearedBoardCount = _stageState != null ? _stageState.ClearedBoardCount : 0,
+                RemainingAdditions = _remainingAdditions,
+                RemainingHints = _remainingHints,
+                CurrentBoardSeed = _currentBoardSeed,
+                NextBoardSeed = _nextBoardSeed,
+                HintedFirstIndex = _hintedPair != null ? _hintedPair.FirstIndex : -1,
+                HintedSecondIndex = _hintedPair != null ? _hintedPair.SecondIndex : -1,
+                Cells = cellSaves,
+            };
+        }
+
+        public void SetBestScore(int bestScore)
+        {
+            _bestScore = Mathf.Max(0, bestScore);
+            _gameScreenView?.SetBestScore(_bestScore);
+        }
+
+        private void InitializeViews()
+        {
+            ApplyPortraitOrientation();
+            EnsureEventSystem();
+
+            Transform canvasTransform = CreateCanvas();
+            _gameScreenView = GameScreenView.Create(
+                canvasTransform,
+                _columns,
+                _regularFont,
+                _boldFont,
+                _appMode == AppMode.Developer && _showSafeAreaDebugOverlay,
+                _plusIconTexture,
+                _hintIconTexture);
+            _gameScreenView.BackClicked += OnBackClicked;
+            _gameScreenView.TileClicked += OnTileClicked;
+            _gameScreenView.PlusClicked += OnPlusClicked;
+            _gameScreenView.HintClicked += OnHintClicked;
+            _gameScreenView.RestartClicked += OnRestartClicked;
+            _gameScreenView.SetCells(_boardState.Cells);
+            _gameScreenView.ScrollToTop();
+            _gameScreenView.SetScore(_scoreService.TotalScore);
+            _gameScreenView.SetBestScore(_bestScore);
+            UpdateAdditionsUi();
+            UpdateHintsUi();
+            _gameScreenView.HideGameOver();
+
+            if (_hintedPair != null)
+            {
+                _gameScreenView.ShowHint(_hintedPair);
+                _gameScreenView.SetHintButtonLocked(true);
+            }
+
+            if (_appMode == AppMode.Developer)
+            {
+                _devPanelView = DevPanelView.Create(canvasTransform, _regularFont);
+                _devPanelView.ShowPairsClicked += OnShowDeveloperPairsClicked;
+                _devPanelView.SolveOnePairClicked += OnSolveOnePairClicked;
+            }
+        }
+
+        private BoardState CreateBoardStateFromSave(RunSaveData runSave)
+        {
+            var restoredCells = new List<BoardCell>();
+            CellSaveData[] savedCells = runSave.Cells ?? Array.Empty<CellSaveData>();
+
+            for (int index = 0; index < savedCells.Length; index++)
+            {
+                CellSaveData savedCell = savedCells[index];
+                var cell = new BoardCell(
+                    index,
+                    index / _columns,
+                    index % _columns,
+                    savedCell.Number)
+                {
+                    IsMatched = savedCell.IsMatched,
+                    IsSelected = savedCell.IsSelected,
+                };
+
+                restoredCells.Add(cell);
+            }
+
+            return new BoardState(restoredCells, _columns, _boardMatchRules);
+        }
+
+        private static int FindSelectedCellIndex(IReadOnlyList<BoardCell> cells)
+        {
+            for (int index = 0; index < cells.Count; index++)
+            {
+                if (cells[index].IsSelected)
+                {
+                    return index;
+                }
+            }
+
+            return -1;
+        }
+
+        private BoardMatchInfo TryRestoreHintedPair(RunSaveData runSave)
+        {
+            if (runSave.HintedFirstIndex < 0 || runSave.HintedSecondIndex < 0)
+            {
+                return null;
+            }
+
+            return _boardMatchRules.TryGetMatchInfo(
+                _boardState.Cells,
+                _columns,
+                runSave.HintedFirstIndex,
+                runSave.HintedSecondIndex,
+                out BoardMatchInfo matchInfo,
+                out _)
+                ? matchInfo
+                : null;
+        }
+
+        private static int DeriveNextBoardSeed(int seed)
+        {
+            unchecked
+            {
+                uint value = (uint)seed;
+                value = (value * 1664525u) + 1013904223u;
+                return (int)value;
             }
         }
 
@@ -189,6 +379,16 @@ namespace Game.Gameplay.Core
             Debug.Log($"GameplayController: Selected {DescribeCell(_boardState.Cells[index])}.");
         }
 
+        private void OnBackClicked()
+        {
+            if (_sessionState == GameSessionState.GameOver)
+            {
+                return;
+            }
+
+            BackToLobbyRequested?.Invoke();
+        }
+
         private void OnPlusClicked()
         {
             if (_sessionState == GameSessionState.GameOver || _boardState == null || !CanUsePlus())
@@ -219,6 +419,7 @@ namespace Game.Gameplay.Core
 
             EvaluateSessionState(showNoMovesTooltip: true);
             UpdateDeveloperInfo();
+            RunStateChanged?.Invoke();
         }
 
         private void OnHintClicked()
@@ -308,6 +509,10 @@ namespace Game.Gameplay.Core
 
             EvaluateSessionState(showNoMovesTooltip: !resolution.BoardCleared);
             UpdateDeveloperInfo();
+            if (_sessionState != GameSessionState.GameOver)
+            {
+                RunStateChanged?.Invoke();
+            }
         }
 
         private void ClearCurrentSelection()
@@ -352,6 +557,11 @@ namespace Game.Gameplay.Core
             _gameScreenView.SetPlusButtonInteractable(CanUsePlus());
         }
 
+        private void UpdateHintsUi()
+        {
+            _gameScreenView?.SetHintCount(_remainingHints);
+        }
+
         private BoardState CreateBoardState(int seed)
         {
             _currentBoardSeed = seed;
@@ -362,9 +572,11 @@ namespace Game.Gameplay.Core
 
         private void StartNextStageBoard()
         {
-            int nextBoardSeed = _boardSeedRandom.Next();
+            int nextBoardSeed = _nextBoardSeed;
             _boardState = CreateBoardState(nextBoardSeed);
+            _nextBoardSeed = DeriveNextBoardSeed(nextBoardSeed);
             UpdateAdditionsUi();
+            UpdateHintsUi();
             _gameScreenView.SetCells(_boardState.Cells);
             _gameScreenView.ScrollToTop();
 
@@ -485,6 +697,7 @@ namespace Game.Gameplay.Core
             ClearCurrentSelection();
             ClearHint();
             _gameScreenView.ShowGameOver(_scoreService.TotalScore, _stageState.Stage);
+            RunCompleted?.Invoke(_scoreService.TotalScore);
 
             Debug.Log(
                 $"GameplayController: Game Over. Final score {_scoreService.TotalScore}, " +
@@ -545,7 +758,7 @@ namespace Game.Gameplay.Core
 
         private void OnRestartClicked()
         {
-            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            RestartRequested?.Invoke();
         }
 
         private string DescribeCell(BoardCell cell)

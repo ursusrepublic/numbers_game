@@ -1,5 +1,5 @@
+using Game.App;
 using Game.Core;
-using Game.Gameplay.Core;
 using TMPro;
 using UnityEngine;
 
@@ -31,16 +31,16 @@ namespace Game.Core.Bootstrap
 
         private void Awake()
         {
-            if (transform.Find("GameplayRoot") != null)
+            if (transform.Find("AppRoot") != null)
             {
                 return;
             }
 
-            var gameplayRoot = new GameObject("GameplayRoot");
-            gameplayRoot.transform.SetParent(transform, false);
+            var appRoot = new GameObject("AppRoot");
+            appRoot.transform.SetParent(transform, false);
 
-            var gameplayController = gameplayRoot.AddComponent<GameplayController>();
-            gameplayController.Initialize(
+            var appFlowController = appRoot.AddComponent<AppFlowController>();
+            appFlowController.Initialize(
                 _appMode,
                 _boardColumns,
                 _initialRows,

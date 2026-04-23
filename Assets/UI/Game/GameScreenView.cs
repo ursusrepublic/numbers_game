@@ -73,6 +73,7 @@ namespace Game.UI.Game
         private BoardView _boardView;
         private AdSlotView _adSlotView;
         private GameObject _overlayRoot;
+        private Button _backButton;
         private Button _plusButton;
         private Button _hintButton;
         private Button _restartButton;
@@ -80,6 +81,8 @@ namespace Game.UI.Game
         private Image _hintButtonBackgroundImage;
         private Image _plusIconImage;
         private Image _hintIconImage;
+        private TMP_Text _backButtonLabel;
+        private TMP_Text _bestScoreLabel;
         private TMP_Text _scoreValueLabel;
         private TMP_Text _tooltipLabel;
         private TMP_Text _plusBadgeLabel;
@@ -96,6 +99,7 @@ namespace Game.UI.Game
         private Vector2 _lastSafeAreaSize = new Vector2(-1f, -1f);
         private float _lastAdHeight = -1f;
 
+        public event Action BackClicked;
         public event Action<int> TileClicked;
         public event Action PlusClicked;
         public event Action HintClicked;
@@ -159,6 +163,25 @@ namespace Game.UI.Game
             topAreaRect.pivot = new Vector2(0.5f, 1f);
             topAreaRect.sizeDelta = new Vector2(0f, TopAreaHeight);
             topAreaRect.anchoredPosition = Vector2.zero;
+
+            (Button backButton, TMP_Text backButtonLabel) =
+                CreateTopTextButton(topAreaObject.transform, "BackButton", "Back");
+            ConfigureRect(
+                (RectTransform)backButton.transform,
+                new Vector2(0f, 0.5f),
+                new Vector2(0f, 0.5f),
+                new Vector2(0f, 0.5f),
+                new Vector2(140f, 44f),
+                new Vector2(16f, 0f));
+
+            TMP_Text bestScoreLabel = CreateTextElement(topAreaObject.transform, "BestScoreLabel");
+            ConfigureRect(
+                (RectTransform)bestScoreLabel.transform,
+                new Vector2(1f, 0.5f),
+                new Vector2(1f, 0.5f),
+                new Vector2(1f, 0.5f),
+                new Vector2(220f, 44f),
+                new Vector2(-16f, 0f));
 
             var scoreAreaObject = new GameObject("ScoreArea", typeof(RectTransform));
             scoreAreaObject.transform.SetParent(safeAreaRect, false);
@@ -325,6 +348,9 @@ namespace Game.UI.Game
                 boardView,
                 adSlotView,
                 overlayRootObject,
+                backButton,
+                backButtonLabel,
+                bestScoreLabel,
                 scoreValueLabel,
                 tooltipLabel,
                 plusButton,
@@ -372,12 +398,25 @@ namespace Game.UI.Game
             }
         }
 
+        public void SetBestScore(int bestScore)
+        {
+            if (_bestScoreLabel != null)
+            {
+                _bestScoreLabel.text = $"Best {bestScore}";
+            }
+        }
+
         public void SetAdditions(int remainingAdditions)
         {
             if (_plusBadgeLabel != null)
             {
                 _plusBadgeLabel.text = remainingAdditions.ToString();
             }
+        }
+
+        public void SetHintCount(int hintCount)
+        {
+            SetHintBadge(hintCount);
         }
 
         public void SetPlusButtonInteractable(bool interactable)
@@ -498,6 +537,11 @@ namespace Game.UI.Game
 
         private void OnDestroy()
         {
+            if (_backButton != null)
+            {
+                _backButton.onClick.RemoveListener(HandleBackClicked);
+            }
+
             if (_boardView != null)
             {
                 _boardView.TileClicked -= HandleBoardTileClicked;
@@ -538,6 +582,9 @@ namespace Game.UI.Game
             BoardView boardView,
             AdSlotView adSlotView,
             GameObject overlayRoot,
+            Button backButton,
+            TMP_Text backButtonLabel,
+            TMP_Text bestScoreLabel,
             TMP_Text scoreValueLabel,
             TMP_Text tooltipLabel,
             Button plusButton,
@@ -583,6 +630,9 @@ namespace Game.UI.Game
             _boardView = boardView;
             _adSlotView = adSlotView;
             _overlayRoot = overlayRoot;
+            _backButton = backButton;
+            _backButtonLabel = backButtonLabel;
+            _bestScoreLabel = bestScoreLabel;
             _scoreValueLabel = scoreValueLabel;
             _tooltipLabel = tooltipLabel;
             _plusButton = plusButton;
@@ -607,6 +657,8 @@ namespace Game.UI.Game
             _restartButton = restartButton;
             _restartButtonLabel = restartButtonLabel;
 
+            ConfigureLabel(_backButtonLabel, effectiveRegularFont, 28, TextAnchor.MiddleLeft, GamePalette.BoardTileText);
+            ConfigureLabel(_bestScoreLabel, effectiveRegularFont, 24, TextAnchor.MiddleRight, GamePalette.BoardTileText);
             ConfigureLabel(_scoreValueLabel, effectiveRegularFont, 62, TextAnchor.MiddleCenter, GamePalette.ScoreValueText);
             ConfigureLabel(_tooltipLabel, effectiveRegularFont, 24, TextAnchor.MiddleCenter, GamePalette.ActionButtonIcon);
             _tooltipLabel.textWrappingMode = TextWrappingModes.Normal;
@@ -620,6 +672,7 @@ namespace Game.UI.Game
             ConfigureLabel(_gameOverStageLabel, effectiveRegularFont, 34, TextAnchor.MiddleCenter, GamePalette.SecondaryText);
             ConfigureLabel(_restartButtonLabel, effectiveRegularFont, 34, TextAnchor.MiddleCenter, GamePalette.PrimaryText);
 
+            _backButton.onClick.AddListener(HandleBackClicked);
             _boardView.TileClicked += HandleBoardTileClicked;
             _adSlotView.HeightChanged += HandleAdSlotHeightChanged;
             _plusButton.onClick.AddListener(HandlePlusClicked);
@@ -627,6 +680,7 @@ namespace Game.UI.Game
             _restartButton.onClick.AddListener(HandleRestartClicked);
 
             SetScore(0);
+            SetBestScore(0);
             SetAdditions(0);
             SetHintBadge(DefaultHintBadgeValue);
             SetPlusButtonInteractable(true);
@@ -638,6 +692,11 @@ namespace Game.UI.Game
         private void HandleBoardTileClicked(int index)
         {
             TileClicked?.Invoke(index);
+        }
+
+        private void HandleBackClicked()
+        {
+            BackClicked?.Invoke();
         }
 
         private void HandlePlusClicked()
@@ -737,6 +796,16 @@ namespace Game.UI.Game
             if (_scoreValueLabel != null)
             {
                 _scoreValueLabel.fontSize = scoreFontSize;
+            }
+
+            if (_backButtonLabel != null)
+            {
+                _backButtonLabel.fontSize = MobileLayout.ClampScaled(28f, 22f, 30f, scale);
+            }
+
+            if (_bestScoreLabel != null)
+            {
+                _bestScoreLabel.fontSize = MobileLayout.ClampScaled(24f, 18f, 28f, scale);
             }
 
             if (_tooltipLabel != null)
@@ -980,6 +1049,36 @@ namespace Game.UI.Game
 
             var buttonImage = buttonObject.GetComponent<Image>();
             buttonImage.color = GamePalette.PrimaryButton;
+
+            var button = buttonObject.GetComponent<Button>();
+            button.transition = Selectable.Transition.None;
+            button.targetGraphic = buttonImage;
+
+            TMP_Text label = CreateTextElement(buttonObject.transform, "Label");
+            RectTransform labelRect = (RectTransform)label.transform;
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = Vector2.zero;
+            labelRect.offsetMax = Vector2.zero;
+            label.text = labelText;
+            label.raycastTarget = false;
+
+            return (button, label);
+        }
+
+        private static (Button Button, TMP_Text Label) CreateTopTextButton(Transform parent, string name, string labelText)
+        {
+            var buttonObject = new GameObject(
+                name,
+                typeof(RectTransform),
+                typeof(Image),
+                typeof(Button));
+
+            buttonObject.transform.SetParent(parent, false);
+
+            var buttonImage = buttonObject.GetComponent<Image>();
+            buttonImage.color = new Color(0f, 0f, 0f, 0f);
+            buttonImage.raycastTarget = true;
 
             var button = buttonObject.GetComponent<Button>();
             button.transition = Selectable.Transition.None;

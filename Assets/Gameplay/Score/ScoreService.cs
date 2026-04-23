@@ -7,6 +7,11 @@ namespace Game.Gameplay.Score
     {
         public int TotalScore { get; private set; }
 
+        public void Restore(int totalScore)
+        {
+            TotalScore = Mathf.Max(0, totalScore);
+        }
+
         public ScoreResult ApplyMatch(BoardMatchResolution resolution, int multiplier)
         {
             int safeMultiplier = Mathf.Max(1, multiplier);
