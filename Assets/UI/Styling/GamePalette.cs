@@ -54,17 +54,21 @@ namespace Game.UI.Styling
         public static readonly Color ScoreValueText = new Color(0.10f, 0.11f, 0.13f, 1f);
         public static readonly Color SafeAreaDebugFill = new Color(0.2353f, 0.5725f, 0.9922f, 0.16f);
         
-        // Buttons, like Plus, Hint
+        // Buttons
         public static readonly Color ActionButtonSurface = new Color(0.9608f, 0.7451f, 0.3098f, 1f);
         public static readonly Color ActionButtonSurfaceDisabled = new Color(0.92f, 0.92f, 0.91f, 1f);
         public static readonly Color ActionButtonIcon = new Color(1f, 1f, 1f, 1f);
         public static readonly Color ActionButtonIconDisabled = new Color(0.60f, 0.66f, 0.73f, 1f);
         public static readonly Color ActionButtonBadgeBackground = new Color(0.9882f, 0.8157f, 0.4588f, 1f);
         public static readonly Color ActionButtonBadgeText = new Color(0.2980f, 0.2549f, 0.1843f, 1f);
+        
+        // Tab Bar
         public static readonly Color TabBarBackground = new Color(0.9804f, 0.9647f, 0.9412f, 0.98f);
         public static readonly Color TabBarBorder = new Color(0.8667f, 0.8314f, 0.7922f, 1f);
         public static readonly Color TabBarActive = new Color(0.2275f, 0.5529f, 0.8706f, 1f);
         public static readonly Color TabBarInactive = new Color(0.5059f, 0.5137f, 0.5451f, 1f);
+        
+        // Daily challenges
         public static readonly Color DailyHeaderIcon = new Color(0.2275f, 0.5529f, 0.8706f, 1f);
         public static readonly Color DailyHeaderText = new Color(0.10f, 0.11f, 0.13f, 1f);
         public static readonly Color DailyWeekdayText = new Color(0.74f, 0.73f, 0.76f, 1f);
