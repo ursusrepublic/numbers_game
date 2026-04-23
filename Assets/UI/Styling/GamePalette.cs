@@ -65,6 +65,19 @@ namespace Game.UI.Styling
         public static readonly Color TabBarBorder = new Color(0.8667f, 0.8314f, 0.7922f, 1f);
         public static readonly Color TabBarActive = new Color(0.2275f, 0.5529f, 0.8706f, 1f);
         public static readonly Color TabBarInactive = new Color(0.5059f, 0.5137f, 0.5451f, 1f);
+        public static readonly Color DailyHeaderIcon = new Color(0.2275f, 0.5529f, 0.8706f, 1f);
+        public static readonly Color DailyHeaderText = new Color(0.10f, 0.11f, 0.13f, 1f);
+        public static readonly Color DailyWeekdayText = new Color(0.74f, 0.73f, 0.76f, 1f);
+        public static readonly Color DailyDayText = new Color(0.36f, 0.36f, 0.40f, 1f);
+        public static readonly Color DailyFutureDayText = new Color(0.84f, 0.83f, 0.85f, 1f);
+        public static readonly Color DailySelectedDayBackground = new Color(0.2275f, 0.5529f, 0.8706f, 1f);
+        public static readonly Color DailySelectedDayText = Color.white;
+        public static readonly Color DailyProgressTrack = new Color(0.90f, 0.91f, 0.93f, 1f);
+        public static readonly Color DailyProgressFill = new Color(0.2275f, 0.5529f, 0.8706f, 1f);
+        public static readonly Color DailyCompletedRing = new Color(0.9608f, 0.7451f, 0.3098f, 1f);
+        public static readonly Color DailyTodayDot = new Color(0.2275f, 0.5529f, 0.8706f, 1f);
+        public static readonly Color DailyProgressBarTrack = new Color(0.90f, 0.91f, 0.93f, 1f);
+        public static readonly Color DailyProgressBarFill = new Color(0.2275f, 0.5529f, 0.8706f, 1f);
 
         public static readonly Color GameOverOverlay = new Color(0.05f, 0.06f, 0.09f, 0.84f);
 

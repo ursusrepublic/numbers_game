@@ -58,6 +58,7 @@ namespace Game.UI.Game
 
         private RectTransform _safeAreaRect;
         private RectTransform _topAreaRect;
+        private RectTransform _modeLabelRect;
         private RectTransform _scoreAreaRect;
         private RectTransform _scoreValueRect;
         private RectTransform _tooltipRect;
@@ -82,6 +83,7 @@ namespace Game.UI.Game
         private Image _plusIconImage;
         private Image _hintIconImage;
         private TMP_Text _backButtonLabel;
+        private TMP_Text _modeLabel;
         private TMP_Text _bestScoreLabel;
         private TMP_Text _scoreValueLabel;
         private TMP_Text _tooltipLabel;
@@ -182,6 +184,15 @@ namespace Game.UI.Game
                 new Vector2(1f, 0.5f),
                 new Vector2(220f, 44f),
                 new Vector2(-16f, 0f));
+
+            TMP_Text modeLabel = CreateTextElement(topAreaObject.transform, "ModeLabel");
+            ConfigureRect(
+                (RectTransform)modeLabel.transform,
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                new Vector2(320f, 44f),
+                Vector2.zero);
 
             var scoreAreaObject = new GameObject("ScoreArea", typeof(RectTransform));
             scoreAreaObject.transform.SetParent(safeAreaRect, false);
@@ -337,6 +348,7 @@ namespace Game.UI.Game
             screenView.Setup(
                 safeAreaRect,
                 topAreaRect,
+                (RectTransform)modeLabel.transform,
                 scoreAreaRect,
                 (RectTransform)scoreValueLabel.transform,
                 (RectTransform)tooltipLabel.transform,
@@ -350,6 +362,7 @@ namespace Game.UI.Game
                 overlayRootObject,
                 backButton,
                 backButtonLabel,
+                modeLabel,
                 bestScoreLabel,
                 scoreValueLabel,
                 tooltipLabel,
@@ -400,10 +413,29 @@ namespace Game.UI.Game
 
         public void SetBestScore(int bestScore)
         {
-            if (_bestScoreLabel != null)
+            SetTopRightText($"Best {bestScore}");
+        }
+
+        public void SetTopRightText(string text)
+        {
+            if (_bestScoreLabel == null)
             {
-                _bestScoreLabel.text = $"Best {bestScore}";
+                return;
             }
+
+            _bestScoreLabel.text = text ?? string.Empty;
+        }
+
+        public void SetModeTitle(string modeTitle)
+        {
+            if (_modeLabel == null)
+            {
+                return;
+            }
+
+            bool hasTitle = !string.IsNullOrWhiteSpace(modeTitle);
+            _modeLabel.text = hasTitle ? modeTitle : string.Empty;
+            _modeLabel.enabled = hasTitle;
         }
 
         public void SetAdditions(int remainingAdditions)
@@ -571,6 +603,7 @@ namespace Game.UI.Game
         private void Setup(
             RectTransform safeAreaRect,
             RectTransform topAreaRect,
+            RectTransform modeLabelRect,
             RectTransform scoreAreaRect,
             RectTransform scoreValueRect,
             RectTransform tooltipRect,
@@ -584,6 +617,7 @@ namespace Game.UI.Game
             GameObject overlayRoot,
             Button backButton,
             TMP_Text backButtonLabel,
+            TMP_Text modeLabel,
             TMP_Text bestScoreLabel,
             TMP_Text scoreValueLabel,
             TMP_Text tooltipLabel,
@@ -620,6 +654,7 @@ namespace Game.UI.Game
             _boardAreaRect = boardAreaRect;
             _safeAreaRect = safeAreaRect;
             _topAreaRect = topAreaRect;
+            _modeLabelRect = modeLabelRect;
             _scoreAreaRect = scoreAreaRect;
             _scoreValueRect = scoreValueRect;
             _tooltipRect = tooltipRect;
@@ -632,6 +667,7 @@ namespace Game.UI.Game
             _overlayRoot = overlayRoot;
             _backButton = backButton;
             _backButtonLabel = backButtonLabel;
+            _modeLabel = modeLabel;
             _bestScoreLabel = bestScoreLabel;
             _scoreValueLabel = scoreValueLabel;
             _tooltipLabel = tooltipLabel;
@@ -658,6 +694,7 @@ namespace Game.UI.Game
             _restartButtonLabel = restartButtonLabel;
 
             ConfigureLabel(_backButtonLabel, effectiveRegularFont, 28, TextAnchor.MiddleLeft, GamePalette.BoardTileText);
+            ConfigureLabel(_modeLabel, effectiveRegularFont, 24, TextAnchor.MiddleCenter, GamePalette.DailyHeaderText);
             ConfigureLabel(_bestScoreLabel, effectiveRegularFont, 24, TextAnchor.MiddleRight, GamePalette.BoardTileText);
             ConfigureLabel(_scoreValueLabel, effectiveRegularFont, 62, TextAnchor.MiddleCenter, GamePalette.ScoreValueText);
             ConfigureLabel(_tooltipLabel, effectiveRegularFont, 24, TextAnchor.MiddleCenter, GamePalette.ActionButtonIcon);
@@ -680,6 +717,7 @@ namespace Game.UI.Game
             _restartButton.onClick.AddListener(HandleRestartClicked);
 
             SetScore(0);
+            SetModeTitle(string.Empty);
             SetBestScore(0);
             SetAdditions(0);
             SetHintBadge(DefaultHintBadgeValue);
@@ -806,6 +844,16 @@ namespace Game.UI.Game
             if (_bestScoreLabel != null)
             {
                 _bestScoreLabel.fontSize = MobileLayout.ClampScaled(24f, 18f, 28f, scale);
+            }
+
+            if (_modeLabelRect != null)
+            {
+                _modeLabelRect.sizeDelta = new Vector2(Mathf.Min(safeWidth - 240f, 360f), MobileLayout.ClampScaled(44f, 36f, 48f, scale));
+            }
+
+            if (_modeLabel != null)
+            {
+                _modeLabel.fontSize = MobileLayout.ClampScaled(24f, 18f, 28f, scale);
             }
 
             if (_tooltipLabel != null)

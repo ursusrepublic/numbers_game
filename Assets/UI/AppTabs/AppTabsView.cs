@@ -1,6 +1,8 @@
 using System;
 using Game.UI.Layout;
 using Game.UI.Styling;
+using Game.App.Daily;
+using Game.UI.Daily;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -18,7 +20,7 @@ namespace Game.UI.AppTabs
         private RectTransform _contentAreaRect;
         private RectTransform _tabBarRect;
         private MainTabView _mainTabView;
-        private PlaceholderTabView _dailyTabView;
+        private DailyChallengesTabView _dailyTabView;
         private PlaceholderTabView _journeyTabView;
         private PlaceholderTabView _meTabView;
         private TabBarView _tabBarView;
@@ -27,6 +29,10 @@ namespace Game.UI.AppTabs
 
         public event Action ContinueClicked;
         public event Action NewGameClicked;
+        public event Action DailyPreviousMonthClicked;
+        public event Action DailyNextMonthClicked;
+        public event Action<DailyChallengeDateKey> DailyDateSelected;
+        public event Action<DailyChallengeDateKey> DailyPlayClicked;
 
         public static AppTabsView Create(
             Transform parent,
@@ -94,7 +100,7 @@ namespace Game.UI.AppTabs
             tabBarRect.anchoredPosition = Vector2.zero;
 
             MainTabView mainTabView = MainTabView.Create(contentAreaObject.transform, regularFont, boldFont);
-            PlaceholderTabView dailyTabView = PlaceholderTabView.Create(contentAreaObject.transform, "Daily", regularFont, boldFont);
+            DailyChallengesTabView dailyTabView = DailyChallengesTabView.Create(contentAreaObject.transform, regularFont, boldFont, dailyIconTexture);
             PlaceholderTabView journeyTabView = PlaceholderTabView.Create(contentAreaObject.transform, "Journey", regularFont, boldFont);
             PlaceholderTabView meTabView = PlaceholderTabView.Create(contentAreaObject.transform, "Me", regularFont, boldFont);
             TabBarView tabBarView = TabBarView.Create(
@@ -136,6 +142,11 @@ namespace Game.UI.AppTabs
         public void SetContinueVisible(bool isVisible)
         {
             _mainTabView?.SetContinueVisible(isVisible);
+        }
+
+        public void SetDailyMonthState(DailyCalendarMonthState state)
+        {
+            _dailyTabView?.SetMonthState(state);
         }
 
         public void SelectTab(AppTabId tabId)
@@ -183,6 +194,14 @@ namespace Game.UI.AppTabs
                 _mainTabView.NewGameClicked -= HandleNewGameClicked;
             }
 
+            if (_dailyTabView != null)
+            {
+                _dailyTabView.PreviousMonthClicked -= HandleDailyPreviousMonthClicked;
+                _dailyTabView.NextMonthClicked -= HandleDailyNextMonthClicked;
+                _dailyTabView.DaySelected -= HandleDailyDateSelected;
+                _dailyTabView.PlayClicked -= HandleDailyPlayClicked;
+            }
+
             if (_tabBarView != null)
             {
                 _tabBarView.TabSelected -= HandleTabSelected;
@@ -194,7 +213,7 @@ namespace Game.UI.AppTabs
             RectTransform contentAreaRect,
             RectTransform tabBarRect,
             MainTabView mainTabView,
-            PlaceholderTabView dailyTabView,
+            DailyChallengesTabView dailyTabView,
             PlaceholderTabView journeyTabView,
             PlaceholderTabView meTabView,
             TabBarView tabBarView)
@@ -210,6 +229,10 @@ namespace Game.UI.AppTabs
 
             _mainTabView.ContinueClicked += HandleContinueClicked;
             _mainTabView.NewGameClicked += HandleNewGameClicked;
+            _dailyTabView.PreviousMonthClicked += HandleDailyPreviousMonthClicked;
+            _dailyTabView.NextMonthClicked += HandleDailyNextMonthClicked;
+            _dailyTabView.DaySelected += HandleDailyDateSelected;
+            _dailyTabView.PlayClicked += HandleDailyPlayClicked;
             _tabBarView.TabSelected += HandleTabSelected;
 
             SelectTab(_selectedTab);
@@ -229,6 +252,26 @@ namespace Game.UI.AppTabs
         private void HandleTabSelected(AppTabId tabId)
         {
             SelectTab(tabId);
+        }
+
+        private void HandleDailyPreviousMonthClicked()
+        {
+            DailyPreviousMonthClicked?.Invoke();
+        }
+
+        private void HandleDailyNextMonthClicked()
+        {
+            DailyNextMonthClicked?.Invoke();
+        }
+
+        private void HandleDailyDateSelected(DailyChallengeDateKey date)
+        {
+            DailyDateSelected?.Invoke(date);
+        }
+
+        private void HandleDailyPlayClicked(DailyChallengeDateKey date)
+        {
+            DailyPlayClicked?.Invoke(date);
         }
 
         private void ApplyResponsiveLayout(bool force)

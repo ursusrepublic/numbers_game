@@ -1,7 +1,9 @@
+using Game.App.Daily;
 using Game.App.Save;
 using Game.Core;
 using Game.Gameplay.Core;
 using Game.UI.AppTabs;
+using Game.UI.Daily;
 using Game.UI.Layout;
 using TMPro;
 using UnityEngine;
@@ -32,10 +34,15 @@ namespace Game.App
 
         private LocalSaveService _saveService;
         private AppSaveData _appSaveData;
+        private DailyChallengesService _dailyChallengesService;
         private AppTabsView _appTabsView;
         private Transform _appTabsCanvasTransform;
         private GameplayController _gameplayController;
+        private Transform _dailyResultCanvasTransform;
+        private DailyChallengeResultView _dailyChallengeResultView;
         private bool _hasUnfinishedRun;
+        private bool _isDailyGameplayRun;
+        private DailyChallengeDateKey _currentDailyDate;
 
         public void Initialize(
             AppMode appMode,
@@ -75,12 +82,17 @@ namespace Game.App
 
             _saveService = new LocalSaveService();
             _appSaveData = _saveService.Load() ?? new AppSaveData();
+            _appSaveData.DailyChallenges ??= new DailyChallengesSaveData();
+            _dailyChallengesService = new DailyChallengesService(_appSaveData.DailyChallenges);
+            _appSaveData.DailyChallenges = _dailyChallengesService.SaveData;
 
             if (!HasValidActiveRun())
             {
                 _appSaveData.ActiveRun = null;
-                _saveService.Save(_appSaveData);
             }
+
+            SanitizeDailyActiveRuns();
+            _saveService.Save(_appSaveData);
 
             ShowAppTabs(AppTabId.Main);
         }
@@ -101,6 +113,8 @@ namespace Game.App
         private void ShowAppTabs(AppTabId selectedTab)
         {
             DestroyGameplay();
+            DestroyDailyResult();
+            _isDailyGameplayRun = false;
 
             if (_appTabsView == null)
             {
@@ -116,11 +130,31 @@ namespace Game.App
                     _meTabIconTexture);
                 _appTabsView.ContinueClicked += HandleContinueClicked;
                 _appTabsView.NewGameClicked += HandleNewGameClicked;
+                _appTabsView.DailyPreviousMonthClicked += HandleDailyPreviousMonthClicked;
+                _appTabsView.DailyNextMonthClicked += HandleDailyNextMonthClicked;
+                _appTabsView.DailyDateSelected += HandleDailyDateSelected;
+                _appTabsView.DailyPlayClicked += HandleDailyPlayClicked;
             }
 
-            _appTabsView.SetBestScore(_appSaveData.BestScore);
-            _appTabsView.SetContinueVisible(HasValidActiveRun());
+            RefreshAppTabsState();
             _appTabsView.SelectTab(selectedTab);
+        }
+
+        private void ShowDailyResult(DailyChallengeDateKey date, int progressScore, int goalScore, bool isCompleted)
+        {
+            DestroyAppTabs();
+            DestroyGameplay();
+            DestroyDailyResult();
+            _isDailyGameplayRun = false;
+
+            _dailyResultCanvasTransform = CreateCanvas("DailyResultCanvas");
+            _dailyChallengeResultView = DailyChallengeResultView.Create(
+                _dailyResultCanvasTransform,
+                _regularFont,
+                _boldFont,
+                _appMode == AppMode.Developer && _showSafeAreaDebugOverlay);
+            _dailyChallengeResultView.ContinueClicked += HandleDailyResultContinueClicked;
+            _dailyChallengeResultView.SetResult(date, progressScore, goalScore, isCompleted);
         }
 
         private void StartNewGame()
@@ -141,6 +175,7 @@ namespace Game.App
                 _hintIconTexture,
                 _appSaveData.BestScore);
 
+            _isDailyGameplayRun = false;
             _hasUnfinishedRun = true;
             _appSaveData.ActiveRun = _gameplayController.CreateRunSaveData();
             _saveService.Save(_appSaveData);
@@ -167,12 +202,83 @@ namespace Game.App
                 _hintIconTexture,
                 _appSaveData.BestScore);
 
+            _isDailyGameplayRun = false;
+            _hasUnfinishedRun = true;
+        }
+
+        private void StartNewDailyRun(DailyChallengeDateKey date)
+        {
+            CreateGameplayController();
+
+            var dailyConfig = new DailyChallengeSessionConfig
+            {
+                Date = date,
+                GoalScore = _dailyChallengesService.GetGoalScore(date),
+                AccumulatedScoreBeforeRun = _dailyChallengesService.GetAccumulatedScore(date),
+            };
+
+            _gameplayController.InitializeNewRun(
+                _appMode,
+                _boardColumns,
+                _initialRows,
+                _startingPairs,
+                _randomSeed,
+                _startingAdditions,
+                _regularFont,
+                _boldFont,
+                _appMode == AppMode.Developer && _showSafeAreaDebugOverlay,
+                _plusIconTexture,
+                _hintIconTexture,
+                _appSaveData.BestScore,
+                dailyConfig);
+
+            _currentDailyDate = date;
+            _isDailyGameplayRun = true;
+            _hasUnfinishedRun = true;
+            _dailyChallengesService.SetActiveRun(date, _gameplayController.CreateRunSaveData());
+            _saveService.Save(_appSaveData);
+        }
+
+        private void ContinueDailyRun(DailyChallengeDateKey date)
+        {
+            RunSaveData dailyRun = _dailyChallengesService.GetActiveRun(date);
+            if (!HasValidRun(dailyRun))
+            {
+                _dailyChallengesService.ClearActiveRun(date);
+                _saveService.Save(_appSaveData);
+                StartNewDailyRun(date);
+                return;
+            }
+
+            CreateGameplayController();
+
+            var dailyConfig = new DailyChallengeSessionConfig
+            {
+                Date = date,
+                GoalScore = _dailyChallengesService.GetGoalScore(date),
+                AccumulatedScoreBeforeRun = _dailyChallengesService.GetAccumulatedScore(date),
+            };
+
+            _gameplayController.InitializeFromSave(
+                _appMode,
+                dailyRun,
+                _regularFont,
+                _boldFont,
+                _appMode == AppMode.Developer && _showSafeAreaDebugOverlay,
+                _plusIconTexture,
+                _hintIconTexture,
+                _appSaveData.BestScore,
+                dailyConfig);
+
+            _currentDailyDate = date;
+            _isDailyGameplayRun = true;
             _hasUnfinishedRun = true;
         }
 
         private void CreateGameplayController()
         {
             DestroyAppTabs();
+            DestroyDailyResult();
             DestroyGameplay();
 
             var gameplayRoot = new GameObject("GameplayRoot");
@@ -208,6 +314,10 @@ namespace Game.App
             {
                 _appTabsView.ContinueClicked -= HandleContinueClicked;
                 _appTabsView.NewGameClicked -= HandleNewGameClicked;
+                _appTabsView.DailyPreviousMonthClicked -= HandleDailyPreviousMonthClicked;
+                _appTabsView.DailyNextMonthClicked -= HandleDailyNextMonthClicked;
+                _appTabsView.DailyDateSelected -= HandleDailyDateSelected;
+                _appTabsView.DailyPlayClicked -= HandleDailyPlayClicked;
             }
 
             if (_appTabsCanvasTransform != null)
@@ -220,6 +330,35 @@ namespace Game.App
             _appTabsView = null;
         }
 
+        private void DestroyDailyResult()
+        {
+            if (_dailyChallengeResultView != null)
+            {
+                _dailyChallengeResultView.ContinueClicked -= HandleDailyResultContinueClicked;
+            }
+
+            if (_dailyResultCanvasTransform != null)
+            {
+                _dailyResultCanvasTransform.gameObject.SetActive(false);
+                Destroy(_dailyResultCanvasTransform.gameObject);
+                _dailyResultCanvasTransform = null;
+            }
+
+            _dailyChallengeResultView = null;
+        }
+
+        private void RefreshAppTabsState()
+        {
+            if (_appTabsView == null)
+            {
+                return;
+            }
+
+            _appTabsView.SetBestScore(_appSaveData.BestScore);
+            _appTabsView.SetContinueVisible(HasValidActiveRun());
+            _appTabsView.SetDailyMonthState(_dailyChallengesService.BuildMonthState(System.DateTime.Today));
+        }
+
         private void HandleContinueClicked()
         {
             ContinueGame();
@@ -230,10 +369,71 @@ namespace Game.App
             StartNewGame();
         }
 
+        private void HandleDailyPreviousMonthClicked()
+        {
+            System.DateTime viewedMonth = _dailyChallengesService.GetViewedMonth();
+            _dailyChallengesService.SetViewedMonth(viewedMonth.AddMonths(-1), System.DateTime.Today);
+            _saveService.Save(_appSaveData);
+            RefreshAppTabsState();
+            _appTabsView?.SelectTab(AppTabId.Daily);
+        }
+
+        private void HandleDailyNextMonthClicked()
+        {
+            System.DateTime viewedMonth = _dailyChallengesService.GetViewedMonth();
+            _dailyChallengesService.SetViewedMonth(viewedMonth.AddMonths(1), System.DateTime.Today);
+            _saveService.Save(_appSaveData);
+            RefreshAppTabsState();
+            _appTabsView?.SelectTab(AppTabId.Daily);
+        }
+
+        private void HandleDailyDateSelected(DailyChallengeDateKey date)
+        {
+            if (!_dailyChallengesService.IsSelectable(date, System.DateTime.Today))
+            {
+                return;
+            }
+
+            _dailyChallengesService.SetSelectedDate(date);
+            _saveService.Save(_appSaveData);
+            RefreshAppTabsState();
+            _appTabsView?.SelectTab(AppTabId.Daily);
+        }
+
+        private void HandleDailyPlayClicked(DailyChallengeDateKey date)
+        {
+            if (!_dailyChallengesService.IsSelectable(date, System.DateTime.Today))
+            {
+                return;
+            }
+
+            if (_dailyChallengesService.IsCompleted(date))
+            {
+                return;
+            }
+
+            _dailyChallengesService.SetSelectedDate(date);
+            _saveService.Save(_appSaveData);
+
+            if (_dailyChallengesService.HasActiveRun(date))
+            {
+                ContinueDailyRun(date);
+                return;
+            }
+
+            StartNewDailyRun(date);
+        }
+
+        private void HandleDailyResultContinueClicked()
+        {
+            ShowAppTabs(AppTabId.Daily);
+        }
+
         private void HandleBackToLobbyRequested()
         {
+            AppTabId targetTab = _isDailyGameplayRun ? AppTabId.Daily : AppTabId.Main;
             SaveCurrentRunIfNeeded();
-            ShowAppTabs(AppTabId.Main);
+            ShowAppTabs(targetTab);
         }
 
         private void HandleRunStateChanged()
@@ -243,21 +443,43 @@ namespace Game.App
                 return;
             }
 
-            _appSaveData.ActiveRun = _gameplayController.CreateRunSaveData();
+            if (_isDailyGameplayRun)
+            {
+                _dailyChallengesService.SetActiveRun(_currentDailyDate, _gameplayController.CreateRunSaveData());
+            }
+            else
+            {
+                _appSaveData.ActiveRun = _gameplayController.CreateRunSaveData();
+            }
+
             _saveService.Save(_appSaveData);
         }
 
         private void HandleRunCompleted(int finalScore)
         {
             _hasUnfinishedRun = false;
+
             if (finalScore > _appSaveData.BestScore)
             {
                 _appSaveData.BestScore = finalScore;
-                _gameplayController?.SetBestScore(_appSaveData.BestScore);
+            }
+
+            if (_isDailyGameplayRun)
+            {
+                DailyChallengeDateKey completedDate = _currentDailyDate;
+                _dailyChallengesService.ApplyCompletedRun(completedDate, finalScore);
+                int goalScore = _dailyChallengesService.GetGoalScore(completedDate);
+                int progressScore = _dailyChallengesService.GetDisplayedProgress(completedDate);
+                bool isCompleted = _dailyChallengesService.IsCompleted(completedDate);
+                _saveService.Save(_appSaveData);
+
+                ShowDailyResult(completedDate, progressScore, goalScore, isCompleted);
+                return;
             }
 
             _appSaveData.ActiveRun = null;
             _saveService.Save(_appSaveData);
+            _gameplayController?.SetBestScore(_appSaveData.BestScore);
         }
 
         private void HandleRestartRequested()
@@ -269,7 +491,15 @@ namespace Game.App
         {
             if (_gameplayController != null && _hasUnfinishedRun)
             {
-                _appSaveData.ActiveRun = _gameplayController.CreateRunSaveData();
+                RunSaveData runSave = _gameplayController.CreateRunSaveData();
+                if (_isDailyGameplayRun)
+                {
+                    _dailyChallengesService.SetActiveRun(_currentDailyDate, runSave);
+                }
+                else
+                {
+                    _appSaveData.ActiveRun = runSave;
+                }
             }
 
             _saveService?.Save(_appSaveData);
@@ -277,11 +507,44 @@ namespace Game.App
 
         private bool HasValidActiveRun()
         {
-            RunSaveData run = _appSaveData?.ActiveRun;
+            return HasValidRun(_appSaveData?.ActiveRun);
+        }
+
+        private static bool HasValidRun(RunSaveData run)
+        {
             return run != null &&
                    run.Columns > 0 &&
                    run.Cells != null &&
                    run.Cells.Length > 0;
+        }
+
+        private void SanitizeDailyActiveRuns()
+        {
+            DailyChallengeDaySaveData[] days = _appSaveData?.DailyChallenges?.Days;
+            if (days == null)
+            {
+                return;
+            }
+
+            for (int index = 0; index < days.Length; index++)
+            {
+                DailyChallengeDaySaveData day = days[index];
+                if (day == null)
+                {
+                    continue;
+                }
+
+                if (day.IsCompleted)
+                {
+                    day.ActiveRun = null;
+                    continue;
+                }
+
+                if (day.ActiveRun != null && !HasValidRun(day.ActiveRun))
+                {
+                    day.ActiveRun = null;
+                }
+            }
         }
 
         private Transform CreateCanvas(string name)

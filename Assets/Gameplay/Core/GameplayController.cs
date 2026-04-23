@@ -43,6 +43,7 @@ namespace Game.Gameplay.Core
         private int _bestScore;
         private int _nextBoardSeed;
         private GameSessionState _sessionState;
+        private DailyChallengeSessionConfig _dailyChallengeSessionConfig;
         private TMP_FontAsset _regularFont;
         private TMP_FontAsset _boldFont;
         private bool _showSafeAreaDebugOverlay;
@@ -66,7 +67,8 @@ namespace Game.Gameplay.Core
             bool showSafeAreaDebugOverlay,
             Texture2D plusIconTexture,
             Texture2D hintIconTexture,
-            int bestScore)
+            int bestScore,
+            DailyChallengeSessionConfig dailyChallengeSessionConfig = null)
         {
             _appMode = appMode;
             _columns = Mathf.Max(1, columns);
@@ -85,6 +87,7 @@ namespace Game.Gameplay.Core
             _startingHints = DefaultHintCount;
             _remainingHints = _startingHints;
             _bestScore = Mathf.Max(0, bestScore);
+            _dailyChallengeSessionConfig = dailyChallengeSessionConfig;
             _regularFont = regularFont != null ? regularFont : boldFont != null ? boldFont : TMP_Settings.defaultFontAsset;
             _boldFont = boldFont != null ? boldFont : _regularFont;
             _showSafeAreaDebugOverlay = showSafeAreaDebugOverlay;
@@ -121,7 +124,8 @@ namespace Game.Gameplay.Core
             bool showSafeAreaDebugOverlay,
             Texture2D plusIconTexture,
             Texture2D hintIconTexture,
-            int bestScore)
+            int bestScore,
+            DailyChallengeSessionConfig dailyChallengeSessionConfig = null)
         {
             _appMode = appMode;
             _columns = Mathf.Max(1, runSave.Columns);
@@ -134,6 +138,7 @@ namespace Game.Gameplay.Core
             _currentBoardSeed = runSave.CurrentBoardSeed;
             _nextBoardSeed = runSave.NextBoardSeed;
             _bestScore = Mathf.Max(0, bestScore);
+            _dailyChallengeSessionConfig = dailyChallengeSessionConfig;
             _regularFont = regularFont != null ? regularFont : boldFont != null ? boldFont : TMP_Settings.defaultFontAsset;
             _boldFont = boldFont != null ? boldFont : _regularFont;
             _showSafeAreaDebugOverlay = showSafeAreaDebugOverlay;
@@ -222,7 +227,7 @@ namespace Game.Gameplay.Core
         public void SetBestScore(int bestScore)
         {
             _bestScore = Mathf.Max(0, bestScore);
-            _gameScreenView?.SetBestScore(_bestScore);
+            UpdateTopInfoUi();
         }
 
         private void InitializeViews()
@@ -247,7 +252,8 @@ namespace Game.Gameplay.Core
             _gameScreenView.SetCells(_boardState.Cells);
             _gameScreenView.ScrollToTop();
             _gameScreenView.SetScore(_scoreService.TotalScore);
-            _gameScreenView.SetBestScore(_bestScore);
+            _gameScreenView.SetModeTitle(IsDailyChallengeMode ? "Daily Challenge" : string.Empty);
+            UpdateTopInfoUi();
             UpdateAdditionsUi();
             UpdateHintsUi();
             _gameScreenView.HideGameOver();
@@ -479,6 +485,7 @@ namespace Game.Gameplay.Core
 
             ScoreResult scoreResult = _scoreService.ApplyMatch(resolution, _stageState.Multiplier);
             _gameScreenView.SetScore(scoreResult.TotalScore);
+            UpdateTopInfoUi();
 
             Debug.Log(
                 $"GameplayController: Matched {DescribeCell(firstCell)} with {DescribeCell(secondCell)} " +
@@ -486,6 +493,12 @@ namespace Game.Gameplay.Core
                 $"(pair {scoreResult.PairScore}, row bonus {scoreResult.RowClearBonus}, " +
                 $"board bonus {scoreResult.BoardClearBonus}) x{scoreResult.Multiplier}. " +
                 $"Total score {scoreResult.TotalScore}.");
+
+            if (HasReachedDailyGoal())
+            {
+                CompleteDailyRun();
+                return;
+            }
 
             if (resolution.BoardCleared)
             {
@@ -696,6 +709,15 @@ namespace Game.Gameplay.Core
 
             ClearCurrentSelection();
             ClearHint();
+            if (IsDailyChallengeMode)
+            {
+                RunCompleted?.Invoke(_scoreService.TotalScore);
+                Debug.Log(
+                    $"GameplayController: Daily run ended. Run score {_scoreService.TotalScore}, " +
+                    $"stage {_stageState.Stage}.");
+                return;
+            }
+
             _gameScreenView.ShowGameOver(_scoreService.TotalScore, _stageState.Stage);
             RunCompleted?.Invoke(_scoreService.TotalScore);
 
@@ -753,12 +775,66 @@ namespace Game.Gameplay.Core
                 $"Score: {_scoreService.TotalScore}\n" +
                 $"Stage: {_stageState.Stage}\n" +
                 $"Additions: {_remainingAdditions}\n" +
+                (IsDailyChallengeMode
+                    ? $"Daily: {GetCurrentDailyProgress()} / {_dailyChallengeSessionConfig.GoalScore}\n"
+                    : string.Empty) +
                 $"Valid Pairs: {pairsCount}");
         }
 
         private void OnRestartClicked()
         {
             RestartRequested?.Invoke();
+        }
+
+        private bool IsDailyChallengeMode => _dailyChallengeSessionConfig != null;
+
+        private int GetCurrentDailyProgress()
+        {
+            if (!IsDailyChallengeMode)
+            {
+                return 0;
+            }
+
+            return Mathf.Min(
+                _dailyChallengeSessionConfig.GoalScore,
+                _dailyChallengeSessionConfig.AccumulatedScoreBeforeRun + _scoreService.TotalScore);
+        }
+
+        private bool HasReachedDailyGoal()
+        {
+            return IsDailyChallengeMode &&
+                   _dailyChallengeSessionConfig.GoalScore > 0 &&
+                   GetCurrentDailyProgress() >= _dailyChallengeSessionConfig.GoalScore;
+        }
+
+        private void UpdateTopInfoUi()
+        {
+            if (_gameScreenView == null)
+            {
+                return;
+            }
+
+            if (IsDailyChallengeMode)
+            {
+                _gameScreenView.SetTopRightText($"Goal {GetCurrentDailyProgress()}/{_dailyChallengeSessionConfig.GoalScore}");
+                return;
+            }
+
+            _gameScreenView.SetBestScore(_bestScore);
+        }
+
+        private void CompleteDailyRun()
+        {
+            ClearCurrentSelection();
+            ClearHint();
+            ClearDeveloperPairLines();
+            _sessionState = GameSessionState.GameOver;
+            _gameScreenView?.ShowTooltip("Daily challenge complete.");
+            RunCompleted?.Invoke(_scoreService.TotalScore);
+
+            Debug.Log(
+                $"GameplayController: Daily challenge goal reached. Run score {_scoreService.TotalScore}, " +
+                $"total daily progress {GetCurrentDailyProgress()} / {_dailyChallengeSessionConfig.GoalScore}.");
         }
 
         private string DescribeCell(BoardCell cell)
