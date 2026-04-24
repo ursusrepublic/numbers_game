@@ -26,7 +26,7 @@ namespace Game.UI.Game
         private const float ControlsToAdSpacing = 5f;
         private const float MaxControlsToAdSpacing = 10f;
         private const float DefaultAdHeight = 50f;
-        private const int DefaultHintBadgeValue = 9;
+        private const int DefaultHintBadgeValue = 3;
         private const float BoardSidePadding = 16f;
         private const float MinBoardSidePadding = 12f;
         private const float MaxBoardSidePadding = 28f;
@@ -98,6 +98,7 @@ namespace Game.UI.Game
         private TMP_Text _gameOverTitleLabel;
         private TMP_Text _restartButtonLabel;
         private Coroutine _tooltipRoutine;
+        private Coroutine _plusPulseRoutine;
         private Vector2 _lastSafeAreaSize = new Vector2(-1f, -1f);
         private float _lastAdHeight = -1f;
 
@@ -459,12 +460,7 @@ namespace Game.UI.Game
             }
 
             _plusButton.interactable = interactable;
-            _plusButtonBackgroundImage.color = interactable
-                ? GamePalette.ActionButtonSurface
-                : GamePalette.ActionButtonSurfaceDisabled;
-            _plusIconImage.color = interactable
-                ? GamePalette.ActionButtonIcon
-                : GamePalette.ActionButtonIconDisabled;
+            ApplyPlusButtonVisualState();
         }
 
         public void SetHintButtonLocked(bool isLocked)
@@ -495,6 +491,21 @@ namespace Game.UI.Game
         public void ReplayHintFeedback()
         {
             _boardView?.ReplayHintFeedback();
+        }
+
+        public void PulsePlusButton()
+        {
+            if (_plusButton == null || _plusButtonBackgroundImage == null || _plusIconImage == null)
+            {
+                return;
+            }
+
+            if (_plusPulseRoutine != null)
+            {
+                StopCoroutine(_plusPulseRoutine);
+            }
+
+            _plusPulseRoutine = StartCoroutine(PlayPlusPulse());
         }
 
         public void ShowTooltip(string message, float duration = 2.5f)
@@ -587,6 +598,12 @@ namespace Game.UI.Game
             if (_plusButton != null)
             {
                 _plusButton.onClick.RemoveListener(HandlePlusClicked);
+            }
+
+            if (_plusPulseRoutine != null)
+            {
+                StopCoroutine(_plusPulseRoutine);
+                _plusPulseRoutine = null;
             }
 
             if (_hintButton != null)
@@ -981,6 +998,44 @@ namespace Game.UI.Game
             _tooltipLabel.enabled = false;
             _tooltipLabel.text = string.Empty;
             _tooltipRoutine = null;
+        }
+
+        private IEnumerator PlayPlusPulse()
+        {
+            Transform plusTransform = _plusButton.transform;
+            Vector3 originalScale = plusTransform.localScale;
+
+            for (int pulse = 0; pulse < 3; pulse++)
+            {
+                plusTransform.localScale = originalScale * 1.08f;
+                _plusButtonBackgroundImage.color = GamePalette.BoardTileHintPulseBackground;
+                _plusIconImage.color = GamePalette.BoardTileText;
+                yield return new WaitForSeconds(0.12f);
+
+                plusTransform.localScale = originalScale;
+                ApplyPlusButtonVisualState();
+                yield return new WaitForSeconds(0.08f);
+            }
+
+            plusTransform.localScale = originalScale;
+            ApplyPlusButtonVisualState();
+            _plusPulseRoutine = null;
+        }
+
+        private void ApplyPlusButtonVisualState()
+        {
+            if (_plusButton == null || _plusButtonBackgroundImage == null || _plusIconImage == null)
+            {
+                return;
+            }
+
+            bool interactable = _plusButton.interactable;
+            _plusButtonBackgroundImage.color = interactable
+                ? GamePalette.ActionButtonSurface
+                : GamePalette.ActionButtonSurfaceDisabled;
+            _plusIconImage.color = interactable
+                ? GamePalette.ActionButtonIcon
+                : GamePalette.ActionButtonIconDisabled;
         }
 
         private static TextMeshProUGUI CreateTextElement(Transform parent, string name)

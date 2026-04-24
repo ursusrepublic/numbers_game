@@ -19,7 +19,9 @@ namespace Game.Gameplay.Core
     [DisallowMultipleComponent]
     public sealed class GameplayController : MonoBehaviour
     {
-        private const int DefaultHintCount = 9;
+        public const int RewardedAdHintGrant = 3;
+
+        private const int DefaultHintCount = 3;
 
         private BoardState _boardState;
         private GameScreenView _gameScreenView;
@@ -54,6 +56,7 @@ namespace Game.Gameplay.Core
         public event Action RunStateChanged;
         public event Action<int> RunCompleted;
         public event Action RestartRequested;
+        public event Action RewardedHintsRequested;
 
         public void InitializeNewRun(
             AppMode appMode,
@@ -228,6 +231,25 @@ namespace Game.Gameplay.Core
         {
             _bestScore = Mathf.Max(0, bestScore);
             UpdateTopInfoUi();
+        }
+
+        public void AddHints(int amount)
+        {
+            int safeAmount = Mathf.Max(0, amount);
+            if (safeAmount == 0)
+            {
+                return;
+            }
+
+            _remainingHints += safeAmount;
+            UpdateHintsUi();
+            _gameScreenView?.ShowTooltip($"+{safeAmount} hints.");
+            RunStateChanged?.Invoke();
+        }
+
+        public void AddRewardedAdHints()
+        {
+            AddHints(RewardedAdHintGrant);
         }
 
         private void InitializeViews()
@@ -446,18 +468,30 @@ namespace Game.Gameplay.Core
             List<BoardMatchInfo> pairs = _boardPairFinder.FindAll(_boardState.Cells, _columns);
             if (pairs.Count == 0)
             {
+                _gameScreenView.PulsePlusButton();
                 _gameScreenView.ShowTooltip("No more pairs. Please tap '+' button to add numbers.");
                 Debug.Log("GameplayController: Hint requested, but the board has no valid pairs.");
                 return;
             }
 
+            if (!CanUseHint())
+            {
+                _gameScreenView.ShowTooltip("No free hints left.");
+                RewardedHintsRequested?.Invoke();
+                Debug.Log("GameplayController: Hint requested, but no free hints remain.");
+                return;
+            }
+
+            _remainingHints--;
             _hintedPair = pairs[_runtimeRandom.Next(pairs.Count)];
             _gameScreenView.ShowHint(_hintedPair);
-            _gameScreenView.SetHintButtonLocked(true);
+            UpdateHintsUi();
             _gameScreenView.ShowTooltip("Hint highlighted.");
+            RunStateChanged?.Invoke();
 
             Debug.Log(
-                $"GameplayController: Hint highlighted {DescribePair(_hintedPair.FirstIndex, _hintedPair.SecondIndex)}.");
+                $"GameplayController: Hint highlighted {DescribePair(_hintedPair.FirstIndex, _hintedPair.SecondIndex)}. " +
+                $"{_remainingHints} hint(s) remaining.");
         }
 
         private void HandleSuccessfulMatch(BoardMatchResolution resolution, BoardCell firstCell, BoardCell secondCell)
@@ -556,7 +590,7 @@ namespace Game.Gameplay.Core
             }
 
             _gameScreenView.ClearHint();
-            _gameScreenView.SetHintButtonLocked(false);
+            UpdateHintsUi();
         }
 
         private void UpdateAdditionsUi()
@@ -572,7 +606,13 @@ namespace Game.Gameplay.Core
 
         private void UpdateHintsUi()
         {
-            _gameScreenView?.SetHintCount(_remainingHints);
+            if (_gameScreenView == null)
+            {
+                return;
+            }
+
+            _gameScreenView.SetHintCount(_remainingHints);
+            _gameScreenView.SetHintButtonLocked(_hintedPair != null || !CanUseHint());
         }
 
         private BoardState CreateBoardState(int seed)
@@ -754,6 +794,11 @@ namespace Game.Gameplay.Core
             }
 
             return false;
+        }
+
+        private bool CanUseHint()
+        {
+            return _remainingHints > 0;
         }
 
         private void ClearDeveloperPairLines()

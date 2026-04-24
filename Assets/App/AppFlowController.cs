@@ -289,6 +289,7 @@ namespace Game.App
             _gameplayController.RunStateChanged += HandleRunStateChanged;
             _gameplayController.RunCompleted += HandleRunCompleted;
             _gameplayController.RestartRequested += HandleRestartRequested;
+            _gameplayController.RewardedHintsRequested += HandleRewardedHintsRequested;
         }
 
         private void DestroyGameplay()
@@ -302,6 +303,7 @@ namespace Game.App
             _gameplayController.RunStateChanged -= HandleRunStateChanged;
             _gameplayController.RunCompleted -= HandleRunCompleted;
             _gameplayController.RestartRequested -= HandleRestartRequested;
+            _gameplayController.RewardedHintsRequested -= HandleRewardedHintsRequested;
 
             _gameplayController.gameObject.SetActive(false);
             Destroy(_gameplayController.gameObject);
@@ -485,6 +487,14 @@ namespace Game.App
         private void HandleRestartRequested()
         {
             StartNewGame();
+        }
+
+        private void HandleRewardedHintsRequested()
+        {
+            // Future rewarded-ad integration point: show the ad here, then call AddRewardedAdHints().
+            Debug.Log(
+                "AppFlowController: Rewarded hints requested. " +
+                "Show a rewarded ad here, then call GameplayController.AddRewardedAdHints().");
         }
 
         private void SaveCurrentRunIfNeeded()
